@@ -1,0 +1,2151 @@
+---
+title: "DATA*6200 Final Project: Severe Injuries and Occupational Illness Tracking Dashboard for understanding Injury Trends"
+author: "Karanvir Virdi
+         Saritha Kumari Krishna Reddy
+         Stephanie Ajah"
+date: "Dec 12, 2024"
+format: html
+execute: 
+  embed-resources: true
+---
+
+# Introduction
+
+The "Severe Injuries and Occupational Illness Tracking Dashboard" is an interactive tool designed to provide insights into injury and illness trends across various industries and states in The United States of America. The dashboard allows users to explore data on severe injuries, including amputations, hospitalizations, and specific occupational illnesses such as respiratory conditions and skin disorders. By visualizing trends over time and filtering by key factors such as year, industry, and state, the dashboard enables stakeholders to identify patterns, assess risks, and develop strategies to improve workplace safety. This project aims to enhance understanding and decision-making related to health and safety.
+
+## Step 1 - Load required libraries and csv files
+
+- 'shiny' is used to build interactive web applications. 
+- 'shinyjs' adds JavaScript functionalities to enhance Shiny apps.
+- 'shinydashboard' provides a framework for creating visually structured dashboards in Shiny. 
+- 'plotly' is used for creating interactive, web-based visualizations. 
+- 'ggplot2' produces static, elegant, and layered data visualizations. 
+- 'dplyr' is used for data manipulation, including functions for filtering, selecting, grouping, and summarizing data.
+- 'maps' provides geographical maps and spatial data for visualizations. 
+- 'tidyr' simplifies data cleaning and reshaping for tidy data structures. 
+- 'DT' is used to display interactive, responsive, and customizable data tables.
+
+```{r message=FALSE}
+# Run the following commands to install the required packages, if you do not have the packages installed
+# install.packages("shiny")
+# install.packages("shinyjs")
+# install.packages("shinydashboard")
+# install.packages("plotly")
+# install.packages("ggplot2")
+# install.packages("dplyr")
+# install.packages("maps")
+# install.packages("tidyr")
+# install.packages("DT")
+
+library(shiny)
+library(shinyjs)
+library(shinydashboard)
+library(plotly)
+library(ggplot2)
+library(dplyr)
+library(maps)
+library(tidyr)
+library(DT)
+```
+
+To read both csv file using function read.csv passing the file path as the required parameter.
+```{r}
+setwd("/Users/sarithakumarik/Documents/DATA6200/FinalProject/Dataset")
+severe_injuries_data <- read.csv("critical_injuries_data.csv", stringsAsFactors = FALSE)
+occ_injuries_data <- read.csv("occupational_illness_data.csv", stringsAsFactors = FALSE)
+```
+
+## Step 2: Design of the Shiny UI Dashboard
+
+The below Shiny UI code defines an interactive dashboard to analyze injury data with a visually appealing and user-friendly interface.
+
+The following are the key pages and features in the UI of the Shiny app:
+
+- Welcome Page:
+  - Features a title, brief description, and a "Get Started" button for navigation.
+  
+- Dashboard Page:
+  - Main navigation hub with buttons for exploring severe injuries and occupational illnesses.
+
+- Severe Injuries Page:
+  - Includes tabs like "Injuries by State," "Top Industries," and "Body Part Analysis."
+  - Provides interactive filters and visualizations for detailed insights.
+
+- Occupational Illness Page:
+  - Similar layout to the Severe Injuries Page with illness-specific analysis tabs.
+  - Offers charts, tables, and filters for customized exploration.
+
+- Accessibility Features:
+  - Back buttons, download options and detailed tables, ensuring a comprehensive exploration of injury and illness data.
+```r
+ui <- fluidPage(
+  useShinyjs(),
+  
+  # Welcome Page
+  div(
+    id = "welcome-page",
+    style = "display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #4682b4;",
+    tags$h1(
+      style = "font-family: 'Playfair Display', serif; font-size: 6rem; font-weight: 700; color: #ffffff; margin-bottom: 2rem;",
+      "Welcome to Injury Data Dashboard!"
+    ),
+    tags$p(
+      style = "font-family: 'Playfair Display', serif; font-size: 2.5rem; color: #333; margin-bottom: 2rem;",
+      "Let's do some analysis."
+    ),
+    actionButton(
+      inputId = "get_started_btn",
+      label = "Get Started",
+      class = "btn btn-primary btn-lg",
+      style = "font-family: 'Playfair Display', serif; font-size: 3rem; font-weight: 600; padding: 1rem 2rem; background-color: #303030; color: #ffffff;"
+    )
+  ),
+  
+  # Dashboard Page
+  hidden(
+    div(
+      id = "dashboard-page",
+      style = "display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #4682b4;",
+      tags$h1(
+        style = "font-family: 'Playfair Display', serif; font-size: 6rem; font-weight: 700; color: #ffffff; margin-bottom: 8rem;",
+        "Injury Data Dashboard"
+      ),
+      fluidRow(
+        actionButton(
+          inputId = "severe_btn",
+          label = "Severe Injuries",
+          class = "btn btn-primary btn-lg",
+          style = "font-family: 'Playfair Display', serif; font-size: 2.5rem; font-weight: 600; padding: 1rem 2rem; margin-right: 1rem; background-color: #303030; color: #ffffff;"
+        ),
+        actionButton(
+          inputId = "occupational_btn",
+          label = "Occupational Injuries/Illnesses",
+          class = "btn btn-primary btn-lg",
+          style = "font-family: 'Playfair Display', serif; font-size: 2.5rem; font-weight: 600; padding: 1rem 2rem; background-color: #303030; color: #ffffff;"
+        )
+      )
+    )
+  ),
+  # Severe Injuries Page
+  hidden(
+    div(
+      id = "severe-page",
+      dashboardPage(
+        dashboardHeader(
+          title = div(
+            actionButton(
+              inputId = "back_button",
+              label = NULL,
+              icon = icon("arrow-left"),
+              style = "margin-right: 0px; border: none; background-color: transparent; color: white;"
+            ),
+            span("Severe Injuries", style = "font-size: 19px; padding-left: 0px;")
+          )
+        ),
+        dashboardSidebar(
+          sidebarMenu(
+            menuItem("Injuries by State", tabName = "state", icon = icon("map-marker-alt")),
+            menuItem("Top Industries", tabName = "industries", icon = icon("building")),
+            menuItem("Top States", tabName = "states", icon = icon("flag-checkered")),
+            menuItem("Event Categories", tabName = "events", icon = icon("calendar-alt")),
+            menuItem("Source Categories", tabName = "source", icon = icon("bullseye")),
+            menuItem("Body Part Analysis", tabName = "bodypart", icon = icon("stethoscope")),
+            menuItem("Trend Overview", tabName = "trend", icon = icon("chart-line")),
+            menuItem("Interactive Filters", tabName = "filtering", icon = icon("filter"))
+          )
+        ),
+        dashboardBody(
+          tabItems(
+            # Injuries by State Tab
+            tabItem(tabName = "state",
+                    h2("Injuries by State Analysis",
+                       style = "font-weight: bold; font-size: 3.5rem; text-align: center;"),
+                    sliderInput(
+                      "year",
+                      "Select Year:",
+                      min = 2015,
+                      max = 2024,
+                      value = 2024,
+                      step = 1,
+                      animate = FALSE,
+                      sep = ""
+                    ),
+                    plotlyOutput("state_plot"),
+                    plotOutput("hospitalization_amputation_plot")
+            ),
+            
+            # Top Industries Tab
+            tabItem(tabName = "industries",
+                    h2("Top Industries Analysis",
+                       style = "font-weight: bold; font-size: 3.5rem; text-align: center;"),
+                    sliderInput(
+                      "year_industry",
+                      "Select Year:",
+                      min = 2015,
+                      max = 2024,
+                      value = 2024,
+                      step = 1,
+                      animate = FALSE,
+                      sep = ""
+                    ),
+                    fluidRow(
+                      column(12, style = "margin-top: 20px;", 
+                             downloadButton("download_industry_plot", "Download Filtered Data", 
+                                            style = "float: right;"))
+                    ),
+                    plotOutput("industry_pie_chart"),
+                    h4("Complete List of all Industries", style = "margin-top: 20px; font-weight: bold; text-align: left;"),
+                    tableOutput("industry_table")
+            ),
+            
+            # Top States Tab
+            tabItem(
+              tabName = "states",
+              h2("Top States Analysis",
+                 style = "font-weight: bold; font-size: 3.5rem; text-align: center;"),
+              sliderInput(
+                "year_state",
+                "Select Year:",
+                min = 2015,
+                max = 2024,
+                value = 2024,
+                step = 1,
+                animate = FALSE,
+                sep = ""
+              ),
+              fluidRow(
+                column(12, style = "margin-top: 20px;", 
+                       downloadButton("download_top_states_plot", "Download Filtered Data", 
+                                      style = "float: right;"))
+              ),
+              plotOutput("top_states_plot"),
+              plotOutput("top_states_amputation_hospitalization"),
+              h4("Complete List of States", style = "margin-top: 20px; font-weight: bold; text-align: left;"),
+              tableOutput("state_table")
+            ),
+            
+            # Event Categories Tab
+            tabItem(
+              tabName = "events",
+              h2("Event Categories Analysis",
+                 style = "font-weight: bold; font-size: 3.5rem; text-align: center;"),
+              sliderInput(
+                "year_event",
+                "Select Year:",
+                min = 2015,
+                max = 2024,
+                value = 2024,
+                step = 1,
+                animate = FALSE,
+                sep = ""
+              ),
+              selectInput(
+                "industry_event",
+                "Select Industry:",
+                choices = c("All Industries", unique(severe_injuries_data$industry)),
+                selected = "All Industries"
+              ),
+              fluidRow(
+                column(12, style = "margin-top: 20px;", 
+                       downloadButton("download_event_category_plot", "Download Filtered Data", 
+                                      style = "float: right;"))
+              ),
+              plotOutput("event_category_pie_chart"),
+              h4("Complete List of Events leading to Injuries", style = "margin-top: 20px; font-weight: bold; text-align: left;"),
+              tableOutput("event_category_table")
+            ),
+            
+            # Source Analysis Tab
+            tabItem(
+              tabName = "source",
+              h2("Source Categories Analysis",
+                 style = "font-weight: bold; font-size: 3.5rem; text-align: center;"),
+              sliderInput(
+                "year_source",
+                "Select Year:",
+                min = 2015,
+                max = 2024,
+                value = 2024,
+                step = 1,
+                animate = FALSE,
+                sep = "" 
+              ),
+              selectInput(
+                "industry_source",
+                "Select Industry:",
+                choices = c("All Industries", unique(severe_injuries_data$industry)),
+                selected = "All Industries"
+              ),
+              fluidRow(
+                column(12, style = "margin-top: 20px;", 
+                       downloadButton("download_source_category_plot", "Download Filtered Data", 
+                                      style = "float: right;"))
+              ),
+              plotOutput("source_category_pie_chart"),
+              h4("Complete List of all Injury Sources", style = "margin-top: 20px; font-weight: bold; text-align: left;"),
+              tableOutput("source_category_table")
+                    
+            ),
+            # Body Part Analysis Tab
+            tabItem(tabName = "bodypart",
+                    h2("Body Part Analysis",
+                       style = "font-weight: bold; font-size: 3.5rem; text-align: center;"),
+                    sliderInput(
+                      "year_body_part",
+                      "Select Year:",
+                      min = 2015,
+                      max = 2024,
+                      value = 2024,
+                      step = 1,
+                      animate = FALSE,
+                      sep = ""
+                    ),
+                    selectInput(
+                      "industry_body_part",
+                      "Select Industry:",
+                      choices = c("All Industries", unique(severe_injuries_data$industry)),
+                      selected = "All Industries"
+                    ),
+                    fluidRow(
+                      column(12, style = "margin-top: 20px;", 
+                             downloadButton("download_body_part_plot", "Download Filtered Data", 
+                                            style = "float: right;"))
+                    ),
+                    plotOutput("body_part_pie_chart"),
+                    h4("Complete List of all Body Parts Injured", style = "margin-top: 20px; font-weight: bold; text-align: left;"),
+                    tableOutput("body_part_table")
+                    
+            ),
+            # Trend Overview Tab
+            tabItem(
+              tabName = "trend",
+              h2("Trend Overview",
+                 style = "font-weight: bold; font-size: 3.5rem; text-align: center;"),
+              selectInput(
+                "industry_trend",
+                "Select Industry:",
+                choices = c("All Industries", unique(severe_injuries_data$industry)),
+                selected = "All Industries"
+              ),
+              fluidRow(
+                column(12, style = "margin-top: 20px;", 
+                       downloadButton("download_trend_plot", "Download Filtered Data", 
+                                      style = "float: right;"))
+              ),
+              plotlyOutput("line_plot")
+            ),
+            
+            # Interactive Filter Tab
+            tabItem(
+              tabName = "filtering",
+              h2("Interactive Filters for Severe Injuries",
+                 style = "font-weight: bold; font-size: 3.5rem; text-align: center;"),
+              
+              # Filters
+              fluidRow(
+                column(4, sliderInput("year_filter", "Select Year:", 
+                                      min = 2015,
+                                      max = 2024,
+                                      value = 2024,
+                                      step = 1,
+                                      animate = FALSE,
+                                      sep = "")),
+                column(4, selectInput("state_filter", "Select State:", 
+                                      choices = c("All States", unique(severe_injuries_data$state)), 
+                                      selected = "All States")),
+                column(4, selectInput("industry_filter", "Select Industry:", 
+                                      choices = c("All Industries", unique(severe_injuries_data$industry)), 
+                                      selected = "All Industries"))
+              ),
+              fluidRow(
+                column(4, selectInput("hospitalized_filter", "Hospitalized:", 
+                                      choices = c("Yes", "No"), 
+                                      selected = "Yes")),
+                column(4, selectInput("amputation_filter", "Amputation:", 
+                                      choices = c("Yes", "No"), 
+                                      selected = "Yes")),
+                column(4, selectInput("nature_filter", "Nature Category:", 
+                                      choices = c("All", unique(severe_injuries_data$nature_category)), 
+                                      selected = "All"))
+              ),
+              fluidRow(
+                column(4, selectInput("body_part_filter", "Body Part:", 
+                                      choices = c("All", unique(severe_injuries_data$body_part)), 
+                                      selected = "All")),
+                column(4, selectInput("event_filter", "Event Category:", 
+                                      choices = c("All", unique(severe_injuries_data$event_category)), 
+                                      selected = "All")),
+                column(4, selectInput("source_filter", "Source Category:", 
+                                      choices = c("All", unique(severe_injuries_data$source_category)), 
+                                      selected = "All"))
+              ),
+              fluidRow(
+                column(12, style = "margin-top: 20px;", 
+                       downloadButton("download_data", "Download Filtered Data", 
+                                      style = "float: right;"))
+              ),
+              DTOutput("filtered_table")
+            )
+          )
+        )
+      )
+    )
+  ),
+  # Occupational Illness Page
+  hidden(
+    div(
+      id = "occ-page",
+      dashboardPage(
+        dashboardHeader(
+          title = div(
+            actionButton(
+              inputId = "back_button_occ",
+              label = NULL,
+              icon = icon("arrow-left"),
+              style = "margin-right: 0px; border: none; background-color: transparent; color: white;"
+            ),
+            span("Occupational Illness", style = "font-size: 19px; padding-left: 0px;")
+          )
+        ),
+        dashboardSidebar(
+          sidebarMenu(
+            menuItem("Illness by State", tabName = "state_occ", icon = icon("map-marker-alt")),
+            menuItem("Top Industries", tabName = "industries_occ", icon = icon("building")),
+            menuItem("Top States", tabName = "states_occ", icon = icon("flag-checkered")),
+            menuItem("Key Injury Metrics by Industry", tabName = "filter_industry_occ", icon = icon("industry")),
+            menuItem("Interactive Filters", tabName = "filtering_occ", icon = icon("filter"))
+          )
+        ),
+        dashboardBody(
+          tabItems(
+            # Injuries by State Tab
+            tabItem(tabName = "state_occ",
+                    div(
+                      h2("Illnesses by State Analysis", 
+                         style = "font-weight: bold; font-size: 3.5rem; text-align: center;")
+                    ),
+                    sliderInput(
+                      "year_occ",
+                      "Select Year:",
+                      min = 2016,
+                      max = 2022,
+                      value = 2022,
+                      step = 1,
+                      animate = FALSE,
+                      sep = ""
+                    ),
+                    plotlyOutput("state_plot_occ")
+            ),
+            # Top Industries Tab
+            tabItem(
+              tabName = "industries_occ",
+              h2("Top Industries Analysis",
+                 style = "font-weight: bold; font-size: 3.5rem; text-align: center;"),
+              sliderInput(
+                "year_industry_occ",
+                "Select Year:",
+                min = 2016,
+                max = 2022,
+                value = 2022,
+                step = 1,
+                animate = FALSE,
+                sep = ""
+              ),
+              fluidRow(
+                column(12, style = "margin-top: 20px;", 
+                       downloadButton("download_industry_plot_occ", "Download Filtered Data", 
+                                      style = "float: right;"))
+              ),
+              plotOutput("industry_pie_chart_occ"),
+              h4("Complete List of all Industries", style = "margin-top: 20px; font-weight: bold; text-align: left;"),
+              tableOutput("industry_table_occ")
+            ),
+            
+            # Top States Tab
+            tabItem(
+              tabName = "states_occ",
+              h2("Top States Analysis",
+                 style = "font-weight: bold; font-size: 3.5rem; text-align: center;"),
+              sliderInput(
+                "year_state_occ",
+                "Select Year:",
+                min = 2016,
+                max = 2022,
+                value = 2022,
+                step = 1,
+                animate = FALSE,
+                sep = ""
+              ),
+              fluidRow(
+                column(12, style = "margin-top: 20px;", 
+                       downloadButton("download_top_states_plot_occ", "Download Filtered Data", 
+                                      style = "float: right;"))
+              ),
+              plotOutput("top_states_plot_occ"),
+              h4("Complete List of States", style = "margin-top: 20px; font-weight: bold; text-align: left;"),
+              tableOutput("states_table_occ")
+                    
+            ),
+            # Key Injury Metrics by Industry Tab
+            tabItem(
+              tabName = "filter_industry_occ",
+              h2("Key Injury Metrics by Industry",
+                 style = "font-weight: bold; font-size: 3.5rem; text-align: center;"),
+              sliderInput(
+                "year_filter_industry_occ",
+                "Select Year:",
+                min = 2016,
+                max = 2022,
+                value = 2022,
+                step = 1,
+                animate = FALSE,
+                sep = ""
+              ),
+              selectInput(
+                "select_industry_occ",
+                "Select Industry:",
+                choices = c("All Industries", unique(occ_injuries_data$industry)),
+                selected = "All Industries",
+                multiple = FALSE
+              ),
+              uiOutput("dynamic_title"),
+              fluidRow(
+                column(12, style = "margin-top: 20px;", 
+                       downloadButton("download_industry_interactive_plots", "Download Filtered Data", 
+                                      style = "float: right;"))
+              ),
+              fluidRow(
+                column(4, plotOutput("illness_employees_plot_occ")),
+                column(4, plotOutput("illness_deaths_plot_occ")),
+                column(4, plotOutput("illness_cases_plot_occ"))
+              ),
+              fluidRow(
+                column(4, plotOutput("illness_days_plot_occ")),
+                column(8, plotOutput("illness_categories_plot_occ"))
+              )
+                    
+            ),
+            # Interactive Filters Tab
+            tabItem(
+              tabName = "filtering_occ",
+              h2("Interactive Filters for Occupational Illness",
+                 style = "font-weight: bold; font-size: 3.5rem; text-align: center;"),
+              
+              # Filters for the page
+              fluidRow(
+                column(
+                  4,
+                  sliderInput(
+                    "year_filter_occ",
+                    "Select Year:",
+                    min = 2016,
+                    max = 2022,
+                    value = 2022,
+                    step = 1,
+                    sep = ""
+                  )
+                ),
+                column(
+                  4,
+                  selectInput(
+                    "industry_filter_occ",
+                    "Select Industry:",
+                    choices = c("All Industries", unique(occ_injuries_data$industry)),
+                    selected = "All Industries"
+                  )
+                ),
+                column(
+                  4,
+                  selectInput(
+                    "state_filter_occ",
+                    "Select State:",
+                    choices = c("All States", unique(occ_injuries_data$state)),
+                    selected = "All States"
+                  )
+                )
+              ),
+              fluidRow(
+                column(
+                  4,
+                  selectInput(
+                    "illness_injuries_filter_occ",
+                    "Illness:",
+                    choices = c("Yes", "No"),
+                    selected = "Yes"
+                  )
+                ),
+                column(
+                  4,
+                  selectInput(
+                    "respiratory_conditions_filter_occ",
+                    "Respiratory Conditions:",
+                    choices = c("No", "Yes"),
+                    selected = "No"
+                  )
+                ),
+                column(
+                  4,
+                  selectInput(
+                    "skin_disorder_filter_occ",
+                    "Skin Disorder:",
+                    choices = c("Yes", "No"),
+                    selected = "No"
+                  )
+                )
+              ),
+              fluidRow(
+                column(
+                  4,
+                  selectInput(
+                    "hearing_loss_filter_occ",
+                    "Hearing Loss:",
+                    choices = c("Yes", "No"),
+                    selected = "No"
+                  )
+                ),
+                column(
+                  4,
+                  selectInput(
+                    "other_illness_filter_occ",
+                    "Other Illness:",
+                    choices = c("Yes", "No"),
+                    selected = "No"
+                  )
+                )
+              ),
+              fluidRow(
+                column(12, style = "margin-top: 20px;", 
+                       downloadButton("download_occ_data", "Download Filtered Data", 
+                                      style = "float: right;"))
+              ),
+              DTOutput("filtered_table_occ")
+            )
+          )
+        )
+      )
+    )
+  )
+)
+```
+
+## Step 3: Functionality of the Shiny UI Dashboard
+
+In the below server function of the Shiny app is where the main logic for rendering UI elements and handling user interactions is implemented. In Shiny, the server function defines the behavior of the app, such as how the app reacts to user input and how it generates dynamic content (e.g., plots, tables, etc.). It takes user inputs, processes them, and outputs the results to the UI. 
+
+Here's a breakdown of what the below server function does:
+
+- Rendering Plots and Charts
+- User Interactions (Buttons and Inputs)
+- Dynamic Table Rendering
+- Downloadable Reports
+
+```r
+server <- function(input, output, session) {
+  # Show dashboard page when 'Get Started' button is clicked
+  observeEvent(input$get_started_btn, {
+    hide("welcome-page")
+    show("dashboard-page")
+  })
+  
+  # Show severe injuries page when 'Severe Injuries' button is clicked
+  observeEvent(input$severe_btn, {
+    hide("dashboard-page")
+    show("severe-page")
+  })
+  
+  # Show occupational injuries page when 'Occupational Injuries' button is clicked
+  observeEvent(input$occupational_btn, {
+    hide("dashboard-page")
+    show("occ-page")
+  })
+  
+  # Handle Back Button on Severe Injuries page
+  observeEvent(input$back_button, {
+    show("dashboard-page")
+    hide("severe-page")
+  })
+  
+  # Handle Back Button on Occupational Injuries page
+  observeEvent(input$back_button_occ, {
+    show("dashboard-page")
+    hide("occ-page")
+  })
+  
+  # SEVERE INJURIES
+  
+  # Injuries by State Analysis
+  
+  # Map plot for total injuries across all the states in US 
+  output$state_plot <- renderPlotly({
+    # Filter and summarize data by state and year
+    state_summary <- severe_injuries_data |>
+      filter(year == input$year) |>
+      group_by(state) |>
+      summarise(Total_Injuries = n(), .groups = "drop")
+    
+    # Convert state names to lowercase for map matching
+    state_summary$state <- tolower(state_summary$state)
+    
+    # Load US state map data
+    us_states <- map_data("state")
+    
+    # Combine map data with injury data
+    map_data_combined <- us_states |>
+      left_join(state_summary, by = c("region" = "state"))
+    
+    # Create hover text for map
+    map_data_combined$hover_text <- paste(
+      "State:", map_data_combined$region,
+      "<br>Total Injuries:", map_data_combined$Total_Injuries
+    )
+    
+    # Create and customize the map plot
+    p <- ggplot(map_data_combined, aes(
+      x = long, y = lat, group = group, fill = Total_Injuries, text = hover_text
+    )) +
+      geom_polygon(color = "white") +
+      coord_fixed(1.3) +
+      scale_fill_gradient(low = "#336699", high = "#003366", na.value = "grey50") +
+      labs(
+        title = paste("Total Severe Injuries by State for", input$year),
+        fill = "Total Injuries"
+      ) +
+      theme_minimal() +
+      theme(
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid = element_blank()
+      )
+    
+    # Convert ggplot to Plotly for interactive features
+    ggplotly(p, tooltip = "text") |>
+      layout(
+        hoverlabel = list(bgcolor = "white", font = list(size = 12)),
+        hovermode = "closest"
+      ) |>
+      config(
+        modeBarButtonsToRemove = c(
+          "pan2d", "select2d", "lasso2d", "autoScale2d", "resetScale2d", 
+          "hoverClosestCartesian", "hoverCompareCartesian", 
+          "zoom2d", "sendDataToCloud"
+        ),
+        displaylogo = FALSE 
+      )
+  })
+  
+  # Visualization for hospitalization and amputation
+  output$hospitalization_amputation_plot <- renderPlot({
+    # Summarize data for hospitalizations and amputations based on the selected year
+    summary_data <- severe_injuries_data |>
+      filter(year == input$year) |>
+      summarise(
+        `Total Hospitalizations` = sum(hospitalization %in% c(1, 2, 3, 4, 5, 6), na.rm = TRUE),
+        `No Hospitalization` = sum(hospitalization == 0, na.rm = TRUE),
+        `Total Amputations` = sum(amputation %in% c(1, 2), na.rm = TRUE),
+        `No Amputation` = sum(amputation == 0, na.rm = TRUE)
+      ) |>
+      tidyr::pivot_longer(cols = c(`Total Hospitalizations`, `No Hospitalization`, `Total Amputations`, `No Amputation`), 
+                          names_to = "Type", 
+                          values_to = "Count")
+    
+    # Create bar plot for hospitalizations and amputations with counts for each category
+    ggplot(summary_data, aes(x = Type, y = Count, fill = Type)) +
+      geom_col(width = 0.6, show.legend = FALSE, alpha = 0.9) +
+      geom_text(aes(label = Count), vjust = -0.5, size = 5, color = "black", fontface = "bold") +
+      theme_minimal() +
+      labs(
+        title = paste("Total Hospitalizations and Amputations in", input$year),
+        x = NULL,
+        y = "Total Count"
+      ) +
+      theme(
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 20),
+        axis.title.y = element_text(face = "bold", size = 14),
+        axis.text.x = element_text(face = "bold", size = 12),
+        axis.text.y = element_text(face = "bold", size = 12),
+        axis.title.x = element_text(face = "bold", size = 14),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor = element_blank()
+      ) +
+      scale_fill_manual(values = c(
+        "Total Hospitalizations" = "#003366", 
+        "No Hospitalization" = "#336699", 
+        "Total Amputations" = "#4d4d4d", 
+        "No Amputation" = "#99ccff"
+      )) +
+      coord_cartesian(clip = "off")
+  })
+  
+  # Top Industries Analysis
+  
+  # Render pie chart of the top 5 industries with the highest number of severe injuries
+  output$industry_pie_chart <- renderPlot({
+    # Filter data based on selected year, group by industry, and calculate total injuries per industry
+    industry_data <- severe_injuries_data |>
+      filter(year == input$year_industry) |>
+      group_by(industry) |>
+      summarise(Total_Injuries = n()) |>
+      arrange(desc(Total_Injuries)) |>
+      mutate(Percentage = round((Total_Injuries / sum(Total_Injuries)) * 100, 1)) |>
+      slice(1:5)
+    
+    custom_colors <- c("#336699", "#003366", "#4d4d4d", "#99ccff", "#1a1a1a")
+    
+    # Create pie chart with custom colors and labels
+    ggplot(industry_data, aes(x = "", y = Total_Injuries, fill = industry)) +
+      geom_bar(stat = "identity", width = 1, color = "white") +
+      coord_polar(theta = "y") +
+      geom_text(aes(label = paste0(Percentage, "%")),
+                position = position_stack(vjust = 0.5), size = 5, color = "white") +
+      labs(
+        title = paste("Top 5 Industries for Severe Injuries in", input$year_industry),
+        fill = "Industry"
+      ) +
+      theme_void() +
+      theme(
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 20),
+        legend.title = element_text(face = "bold"),
+        legend.text = element_text(size = 10)
+      ) +
+      scale_fill_manual(values = custom_colors)
+  })
+  
+  # Render table showing total injuries and percentage of injuries by industry
+  output$industry_table <- renderTable({
+    # Calculate total number of injuries for the selected year
+    total_injuries <- severe_injuries_data |>
+      filter(year == input$year_industry) |>
+      summarise(Total_Injuries = n()) |>
+      pull(Total_Injuries)
+    
+    # Summarize injuries by industry, calculate percentage for each industry
+    industry_data <- severe_injuries_data |>
+      filter(year == input$year_industry) |>
+      group_by(industry) |>
+      summarise(Total_Injuries = n()) |>
+      arrange(desc(Total_Injuries)) |>
+      mutate(Percentage = round((Total_Injuries / total_injuries) * 100, 1)) |>
+      rename(
+        `Industry` = industry,
+        `Total Injuries` = Total_Injuries,
+        `Percentage (%)` = Percentage
+      )
+    # Return the summarized data as a table
+    industry_data
+  })
+  
+  # Download the top industries pie chart as a PNG image
+  output$download_industry_plot <- downloadHandler(
+    # Define filename format for the downloaded image
+    filename = function() {
+      paste("top_industries_pie_chart_", Sys.time(), ".png", sep = "")
+    },
+    content = function(file) {
+      # Generate the top 5 industries data for the pie chart
+      industry_data <- severe_injuries_data |>
+        filter(year == input$year_industry) |>
+        group_by(industry) |>
+        summarise(Total_Injuries = n()) |>
+        arrange(desc(Total_Injuries)) |>
+        mutate(Percentage = round((Total_Injuries / sum(Total_Injuries)) * 100, 1)) |>
+        slice(1:5)
+      
+      custom_colors <- c("#336699", "#003366", "#4d4d4d", "#99ccff", "#1a1a1a")
+      
+      # Create pie chart plot
+      p <- ggplot(industry_data, aes(x = "", y = Total_Injuries, fill = industry)) +
+        geom_bar(stat = "identity", width = 1, color = "white") +
+        coord_polar(theta = "y") +
+        geom_text(aes(label = paste0(Percentage, "%")),
+                  position = position_stack(vjust = 0.5), size = 5, color = "white") +
+        labs(
+          title = paste("Top 5 Industries for Severe Injuries in", input$year_industry),
+          fill = "Industry"
+        ) +
+        theme_void() +
+        theme(
+          plot.title = element_text(hjust = 0.5, face = "bold", size = 20),
+          legend.title = element_text(face = "bold"),
+          legend.text = element_text(size = 10)
+        ) +
+        scale_fill_manual(values = custom_colors)
+      
+      # Save the plot as a PNG file
+      ggsave(file, plot = p, width = 8, height = 6, dpi = 300)
+    }
+  )
+  
+  # Top States Analysis
+  
+  # Render a horizontal bar plot showing the top 5 states with the highest total injuries
+  output$top_states_plot <- renderPlot({
+    # Summarize the data to get the top 5 states with the highest total injuries for the selected year
+    top_states <- severe_injuries_data |>
+      filter(year == input$year_state) |>
+      group_by(state) |>
+      summarise(Total_Injuries = n()) |>
+      arrange(desc(Total_Injuries)) |>
+      slice(1:5) |>
+      mutate(state = stringr::str_to_title(state)) # Capitalize the first letter of each state
+    
+    # Create a horizontal bar plot of the top 5 states with the highest total injuries
+    ggplot(top_states, aes(x = reorder(state, Total_Injuries), y = Total_Injuries, fill = state)) +
+      geom_col(show.legend = FALSE) +
+      coord_flip() +
+      labs(
+        title = paste("Top 5 States by Total Injuries in", input$year_state),
+        x = "State",
+        y = "Total Injuries"
+      ) +
+      theme_minimal() +
+      theme(
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 20),
+        axis.title.y = element_text(face = "bold", size = 14),
+        axis.text.x = element_text(face = "bold", size = 12),
+        axis.text.y = element_text(face = "bold", size = 12),
+        axis.title.x = element_text(face = "bold", size = 14),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor = element_blank()
+      ) +
+      scale_fill_manual(values = c("#336699", "#003366", "#4d4d4d", "#99ccff", "#1a1a1a"))
+  })
+  
+  # Render a horizontal bar plot showing total amputations and hospitalizations by state
+  output$top_states_amputation_hospitalization <- renderPlot({
+    # Summarize data for total amputations and hospitalizations by state for the selected year
+    states_amputation_hospitalization <- severe_injuries_data |>
+      filter(year == input$year_state) |>
+      group_by(state) |>
+      summarise(
+        Total_Amputations = sum(amputation %in% c(1, 2), na.rm = TRUE),
+        Total_Hospitalizations = sum(hospitalization > 0, na.rm = TRUE)
+      ) |>
+      arrange(desc(Total_Hospitalizations)) |>
+      slice(1:5) |>
+      mutate(state = stringr::str_to_title(state))
+    
+    # Reshape the data to long format for plotting
+    melted_data <- states_amputation_hospitalization |>
+      pivot_longer(cols = c(Total_Amputations, Total_Hospitalizations), names_to = "Type", values_to = "Count")
+    
+    # Create a side-by-side bar plot comparing total amputations and hospitalizations across the top 5 states
+    ggplot(melted_data, aes(x = reorder(state, Count), y = Count, fill = Type)) +
+      geom_col(position = "dodge") +
+      coord_flip() +
+      labs(
+        title = paste("Top States for Amputations and Hospitalizations in", input$year_state),
+        x = "State",
+        y = "Count",
+        fill = "Type"
+      ) +
+      theme_minimal() +
+      theme(
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 20),
+        axis.title.y = element_text(face = "bold", size = 14),
+        axis.text.x = element_text(face = "bold", size = 12),
+        axis.text.y = element_text(face = "bold", size = 12),
+        axis.title.x = element_text(face = "bold", size = 14),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor = element_blank()
+      ) +
+      scale_fill_manual(values = c(
+        "Total_Amputations" = "#1f77b4",
+        "Total_Hospitalizations" = "#595959"
+      ))
+  })
+  
+  # Render a table for total injuries, amputations, and hospitalizations by state
+  output$state_table <- renderTable({
+    # Summarize data for total injuries, amputations, and hospitalizations by state for the selected year
+    states_table <- severe_injuries_data |>
+      filter(year == input$year_state) |>
+      group_by(state) |>
+      summarise(
+        Total_Injuries = n(),
+        Total_Amputations = sum(amputation %in% c(1, 2), na.rm = TRUE),
+        Total_Hospitalizations = sum(hospitalization > 0, na.rm = TRUE)
+      ) |>
+      arrange(desc(Total_Injuries)) |>
+      mutate(state = stringr::str_to_title(state)) |>
+      rename(
+        `State` = state,
+        `Total Injuries` = Total_Injuries,
+        `Total Amputations` = Total_Amputations,
+        `Total Hospitalizations` = Total_Hospitalizations
+      )
+    
+    # Display the summarized data as a table
+    states_table
+  })
+  
+  #Body Part Analysis
+  
+  #Plot the top 5 body parts with the most injuries for the selected year and industry (if specified)
+  output$body_part_pie_chart <- renderPlot({
+    # Filter data based on selected year and industry, then group by body part
+    body_part_data <- severe_injuries_data |>
+      filter(
+        year == input$year_body_part,
+        if (input$industry_body_part != "All Industries") industry == input$industry_body_part else TRUE
+      ) |>
+      group_by(body_part) |>
+      summarise(Total = n()) |>
+      arrange(desc(Total)) |>
+      mutate(Percentage = round((Total / sum(Total)) * 100, 1)) |>
+      slice(1:5)
+    
+    custom_colors <- c("#336699", "#003366", "#4d4d4d", "#99ccff", "#1a1a1a")
+    
+    # Create a pie chart displaying the top 5 body parts and their respective percentages
+    ggplot(body_part_data, aes(x = "", y = Total, fill = body_part)) +
+      geom_col(width = 1) +
+      coord_polar(theta = "y") +
+      geom_text(aes(label = paste0(Percentage, "%")),
+                position = position_stack(vjust = 0.5), size = 5, color = "white") +
+      labs(
+        title = paste("Top 5 Body Parts in", input$year_body_part,
+                      if (input$industry_body_part != "All Industries") paste("for", input$industry_body_part) else ""),
+        fill = "Body Part"
+      ) +
+      theme_void() +
+      theme(
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 20),
+        legend.title = element_text(face = "bold"),
+        legend.text = element_text(size = 10)
+      ) +
+      scale_fill_manual(values = custom_colors)
+  })
+  
+  # Create and display a table showing the total injuries and percentage for the top 5 body parts
+  output$body_part_table <- renderTable({
+    body_part_data <- severe_injuries_data |>
+      filter(
+        year == input$year_body_part,
+        if (input$industry_body_part != "All Industries") industry == input$industry_body_part else TRUE
+      ) |>
+      group_by(body_part) |>
+      summarise(Total = n()) |>
+      arrange(desc(Total)) |>
+      mutate(Percentage = round((Total / sum(Total)) * 100, 1)) |>
+      rename(
+        `Body Part` = body_part,
+        `Total Injuries` = Total,
+        `Percentage (%)` = Percentage
+      )
+    
+    # Return the summarized data as a table
+    body_part_data
+  })
+  
+  # Download the body part pie chart as a PNG file
+  output$download_body_part_plot <- downloadHandler(
+    filename = function() {
+      paste("body_part_pie_chart_", Sys.time(), ".png", sep = "")
+    },
+    content = function(file) {
+      # Filter and summarize the data for the pie chart
+      body_part_data <- severe_injuries_data |>
+        filter(
+          year == input$year_body_part,
+          if (input$industry_body_part != "All Industries") industry == input$industry_body_part else TRUE
+        ) |>
+        group_by(body_part) |>
+        summarise(Total = n()) |>
+        arrange(desc(Total)) |>
+        mutate(Percentage = round((Total / sum(Total)) * 100, 1)) |>
+        slice(1:5)
+      
+      custom_colors <- c("#336699", "#003366", "#4d4d4d", "#99ccff", "#1a1a1a")
+      
+      # Create the pie chart plot
+      p <- ggplot(body_part_data, aes(x = "", y = Total, fill = body_part)) +
+        geom_col(width = 1) +
+        coord_polar(theta = "y") +
+        geom_text(aes(label = paste0(Total, " (", Percentage, "%)")),
+                  position = position_stack(vjust = 0.5), size = 5, color = "white") +
+        labs(
+          title = paste("Top 5 Body Parts in", input$year_body_part,
+                        if (input$industry_body_part != "All Industries") paste("for", input$industry_body_part) else ""),
+          fill = "Body Part"
+        ) +
+        theme_void() +
+        theme(
+          plot.title = element_text(hjust = 0.5, face = "bold", size = 20),
+          legend.title = element_text(face = "bold"),
+          legend.text = element_text(size = 10)
+        ) +
+        scale_fill_manual(values = custom_colors)
+      
+      # Save the plot as a PNG file
+      ggsave(file, plot = p, width = 8, height = 6, dpi = 300)
+    }
+  )
+  
+  # Event Categories Analysis
+  
+  # Plot the top 5 event categories with the most injuries for the selected year and industry (if specified)
+  output$event_category_pie_chart <- renderPlot({
+    # Filter data based on selected year and industry, then group by event category
+    event_data <- severe_injuries_data |>
+      filter(
+        year == input$year_event,
+        if (input$industry_event != "All Industries") industry == input$industry_event else TRUE
+      ) |>
+      group_by(event_category) |>
+      summarise(Total = n()) |>
+      arrange(desc(Total)) |>
+      mutate(Percentage = round((Total / sum(Total)) * 100, 1)) |>
+      slice(1:5)
+    
+    custom_colors <- c("#336699", "#003366", "#4d4d4d", "#99ccff", "#1a1a1a")
+    
+    # Create a pie chart displaying the top 5 event categories and their respective percentages
+    ggplot(event_data, aes(x = "", y = Total, fill = event_category)) +
+      geom_col(width = 1) +
+      coord_polar(theta = "y") +
+      geom_text(aes(label = paste0(Percentage, "%")),
+                position = position_stack(vjust = 0.5), size = 5, color = "white") +
+      labs(
+        title = paste("Top 5 Event Categories in", input$year_event,
+                      if (input$industry_event != "All Industries") paste("for", input$industry_event) else ""),
+        fill = "Event Category"
+      ) +
+      theme_void() +
+      theme(
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 20),
+        legend.title = element_text(face = "bold"),
+        legend.text = element_text(size = 10)
+      ) +
+      scale_fill_manual(values = custom_colors)
+  })
+  
+  # Create and display a table showing the total injuries and percentage for the top 5 event categories
+  output$event_category_table <- renderTable({
+    event_data <- severe_injuries_data |>
+      filter(
+        year == input$year_event,
+        if (input$industry_event != "All Industries") industry == input$industry_event else TRUE
+      ) |>
+      group_by(event_category) |>
+      summarise(Total = n()) |>
+      arrange(desc(Total)) |>
+      mutate(Percentage = round((Total / sum(Total)) * 100, 1)) |>
+      rename(
+        `Event Category` = event_category,
+        `Total Injuries` = Total,
+        `Percentage (%)` = Percentage
+      )
+    
+    # Return the summarized data as a table
+    event_data
+  })
+  
+  # Download the event category pie chart as a PNG file
+  output$download_event_category_plot <- downloadHandler(
+    filename = function() {
+      paste("event_category_pie_chart_", Sys.time(), ".png", sep = "")
+    },
+    content = function(file) {
+      # Filter and summarize the data for the pie chart
+      event_data <- severe_injuries_data |>
+        filter(
+          year == input$year_event,
+          if (input$industry_event != "All Industries") industry == input$industry_event else TRUE
+        ) |>
+        group_by(event_category) |>
+        summarise(Total = n()) |>
+        arrange(desc(Total)) |>
+        mutate(Percentage = round((Total / sum(Total)) * 100, 1)) |>
+        slice(1:5)
+      
+      custom_colors <- c("#336699", "#003366", "#4d4d4d", "#99ccff", "#1a1a1a")
+      
+      # Create the pie chart plot
+      p <- ggplot(event_data, aes(x = "", y = Total, fill = event_category)) +
+        geom_col(width = 1) +
+        coord_polar(theta = "y") +
+        geom_text(aes(label = paste0(Total, " (", Percentage, "%)")),
+                  position = position_stack(vjust = 0.5), size = 5, color = "white") +
+        labs(
+          title = paste("Top 5 Event Categories in", input$year_event,
+                        if (input$industry_event != "All Industries") paste("for", input$industry_event) else ""),
+          fill = "Event Category"
+        ) +
+        theme_void() +
+        theme(
+          plot.title = element_text(hjust = 0.5, face = "bold", size = 20),
+          legend.title = element_text(face = "bold"),
+          legend.text = element_text(size = 10)
+        ) +
+        scale_fill_manual(values = custom_colors)
+      
+      # Save the plot as a PNG file
+      ggsave(file, plot = p, width = 8, height = 6, dpi = 300)
+    }
+  )
+  
+  # Source Categories Analysis
+  
+  # Plot the top 5 source categories with the most injuries for the selected year and industry (if specified)
+  output$source_category_pie_chart <- renderPlot({
+    # Filter data based on selected year and industry, then group by source category
+    source_data <- severe_injuries_data |>
+      filter(
+        year == input$year_source,
+        if (input$industry_source != "All Industries") industry == input$industry_source else TRUE
+      ) |>
+      group_by(source_category) |>
+      summarise(Total = n()) |>
+      arrange(desc(Total)) |>
+      mutate(Percentage = round((Total / sum(Total)) * 100, 1)) |>
+      slice(1:5)
+    
+    custom_colors <- c("#336699", "#003366", "#4d4d4d", "#99ccff", "#1a1a1a")
+    
+    # Create a pie chart displaying the top 5 source categories and their respective percentages
+    ggplot(source_data, aes(x = "", y = Total, fill = source_category)) +
+      geom_col(width = 1) +
+      coord_polar(theta = "y") +
+      geom_text(aes(label = paste0(Percentage, "%")),
+                position = position_stack(vjust = 0.5), size = 5, color = "white") +
+      labs(
+        title = paste("Top 5 Source Categories in", input$year_source,
+                      if (input$industry_source != "All Industries") paste("for", input$industry_source) else ""),
+        fill = "Source Category"
+      ) +
+      theme_void() +
+      theme(
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 20),
+        legend.title = element_text(face = "bold"),
+        legend.text = element_text(size = 10)
+      ) +
+      scale_fill_manual(values = custom_colors)
+  })
+  
+  # Create and display a table showing the total injuries and percentage for the top 5 source categories
+  output$source_category_table <- renderTable({
+    # Filter data based on selected year and industry, then group by source category
+    source_data <- severe_injuries_data |>
+      filter(
+        year == input$year_source,
+        if (input$industry_source != "All Industries") industry == input$industry_source else TRUE
+      ) |>
+      group_by(source_category) |>
+      summarise(Total = n()) |>
+      arrange(desc(Total)) |>
+      mutate(Percentage = round((Total / sum(Total)) * 100, 1)) |>
+      rename(
+        `Source Category` = source_category,
+        `Total Injuries` = Total,
+        `Percentage (%)` = Percentage
+      )
+    
+    # Return the summarized data as a table
+    source_data
+  })
+  
+  # Download the source category pie chart as a PNG file
+  output$download_source_category_plot <- downloadHandler(
+    filename = function() {
+      paste("source_category_pie_chart_", Sys.time(), ".png", sep = "")
+    },
+    content = function(file) {
+      source_data <- severe_injuries_data |>
+        filter(
+          year == input$year_source,
+          if (input$industry_source != "All Industries") industry == input$industry_source else TRUE
+        ) |>
+        group_by(source_category) |>
+        summarise(Total = n()) |>
+        arrange(desc(Total)) |>
+        mutate(Percentage = round((Total / sum(Total)) * 100, 1)) |>
+        slice(1:5)
+      
+      custom_colors <- c("#336699", "#003366", "#4d4d4d", "#99ccff", "#1a1a1a")
+      
+      # Create the pie chart plot
+      p <- ggplot(source_data, aes(x = "", y = Total, fill = source_category)) +
+        geom_col(width = 1) +
+        coord_polar(theta = "y") +
+        geom_text(aes(label = paste0(Total, " (", Percentage, "%)")),
+                  position = position_stack(vjust = 0.5), size = 5, color = "white") +
+        labs(
+          title = paste("Top 5 Source Categories in", input$year_source,
+                        if (input$industry_source != "All Industries") paste("for", input$industry_source) else ""),
+          fill = "Source Category"
+        ) +
+        theme_void() +
+        theme(
+          plot.title = element_text(hjust = 0.5, face = "bold", size = 20),
+          legend.title = element_text(face = "bold"),
+          legend.text = element_text(size = 10)
+        ) +
+        scale_fill_manual(values = custom_colors)
+      
+      # Save the plot as a PNG file
+      ggsave(file, plot = p, width = 8, height = 6, dpi = 300)
+    }
+  )
+  
+  # Trend Overview
+  
+  # Plot trend overview of injuries over years
+  output$line_plot <- renderPlotly({
+    # Filter data based on selected year and industry, then group by year
+    trend_data <- severe_injuries_data |>
+      filter(if (input$industry_trend != "All Industries") industry == input$industry_trend else TRUE) |>
+      group_by(year) |>
+      summarise(
+        Total_Injuries = n(),
+        Total_Hospitalized = sum(hospitalization > 0, na.rm = TRUE),
+        Total_Amputations = sum(amputation > 0, na.rm = TRUE)
+      ) |>
+      pivot_longer(
+        cols = c(Total_Injuries, Total_Hospitalized, Total_Amputations), 
+        names_to = "Metric", 
+        values_to = "Count"
+      )
+    
+    trend_data$year <- as.factor(trend_data$year)
+    
+    # Create a plot displaying the trend overview of injuries over the years
+    p <- ggplot(trend_data, aes(x = year, y = Count, color = Metric, group = Metric)) +
+      geom_line(size = 1.2) +
+      geom_point(size = 3) +
+      theme_minimal(base_size = 14) +
+      labs(
+        title = paste("Trend Over Years", 
+                      if (input$industry_trend != "All Industries") paste("for", input$industry_trend) else "for All Industries"),
+        x = "Year",
+        y = "Count",
+        color = "Metric"
+      ) +
+      theme(
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+        axis.title.x = element_text(face = "bold", size = 10),
+        axis.title.y = element_text(face = "bold", size = 10),
+        axis.text.x = element_text(size = 8, angle = 45, hjust = 1),
+        axis.text.y = element_text(size = 8),
+        legend.title = element_text(face = "bold", size = 8),
+        legend.text = element_text(size = 8)
+      ) +
+      scale_color_manual(values = c(
+        "Total_Injuries" = "#336699",
+        "Total_Hospitalized" = "#4d4d4d",
+        "Total_Amputations" = "#003366"
+      ))
+    
+    ggplotly(p, tooltip = c("x", "y", "color")) |>
+      config(displayModeBar = FALSE)
+  })
+  
+  # Download the trend overview line plot as a PNG file
+  output$download_trend_plot <- downloadHandler(
+    filename = function() {
+      # Generate the file name with timestamp
+      paste("trend_overview_", Sys.time(), ".png", sep = "")
+    },
+    content = function(file) {
+      # Filter and summarize the data for the line graph
+      trend_data <- severe_injuries_data |>
+        filter(if (input$industry_trend != "All Industries") industry == input$industry_trend else TRUE) |>
+        group_by(year) |>
+        summarise(
+          Total_Injuries = n(),
+          Total_Hospitalized = sum(hospitalization > 0, na.rm = TRUE),
+          Total_Amputations = sum(amputation > 0, na.rm = TRUE)
+        ) |>
+        pivot_longer(
+          cols = c(Total_Injuries, Total_Hospitalized, Total_Amputations), 
+          names_to = "Metric", 
+          values_to = "Count"
+        )
+      
+      trend_data$year <- as.factor(trend_data$year)
+      
+      # Create the line graph
+      p <- ggplot(trend_data, aes(x = year, y = Count, color = Metric, group = Metric)) +
+        geom_line(size = 0.3) +
+        geom_point(size = 0.5) +
+        theme_minimal(base_size = 8) +
+        labs(
+          title = paste("Trend Over Years", 
+                        if (input$industry_trend != "All Industries") paste("for", input$industry_trend) else ""),
+          x = "Year",
+          y = "Count",
+          color = "Metric"
+        ) +
+        theme(
+          plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+          axis.title.x = element_text(face = "bold", size = 10),
+          axis.title.y = element_text(face = "bold", size = 10),
+          axis.text.x = element_text(size = 8, angle = 45, hjust = 1),
+          axis.text.y = element_text(size = 8),
+          legend.title = element_text(face = "bold", size = 8),
+          legend.text = element_text(size = 8) 
+        )+
+        scale_color_manual(values = c(
+          "Total_Injuries" = "#336699",
+          "Total_Hospitalized" = "#4d4d4d",
+          "Total_Amputations" = "#003366"
+        ))
+      
+      # Save the plot as a PNG file
+      ggsave(file, plot = p, width = 10, height = 6)
+    }
+  )
+  
+  # Interactive Filters for Severe Injuries
+  
+  # Reactive expression for filtering the data based on user inputs
+  filtered_data <- reactive({
+    data <- severe_injuries_data
+    
+    # Filter data by year
+    data <- data |> filter(year == input$year_filter)
+    
+    # Filter by state if a specific state is selected
+    if (input$state_filter != "All States") {
+      data <- data |> filter(state == input$state_filter)
+    }
+    
+    # Filter by industry if a specific industry is selected
+    if (input$industry_filter != "All Industries") {
+      data <- data |> filter(industry == input$industry_filter)
+    }
+    
+    # Filter based on hospitalization status
+    if (input$hospitalized_filter == "Yes") {
+      data <- data |> filter(hospitalization %in% 1:6)
+    } else {
+      data <- data |> filter(hospitalization == 0)
+    }
+    
+    # Filter based on amputation status
+    if (input$amputation_filter == "Yes") {
+      data <- data |> filter(amputation %in% 1:2)
+    } else {
+      data <- data |> filter(amputation == 0)
+    }
+    
+    # Filter by nature of the injury if a specific category is selected
+    if (input$nature_filter != "All") {
+      data <- data |> filter(nature_category == input$nature_filter)
+    }
+    
+    # Filter by affected body part if a specific category is selected
+    if (input$body_part_filter != "All") {
+      data <- data |> filter(body_part == input$body_part_filter)
+    }
+    
+    # Filter by event category if a specific category is selected
+    if (input$event_filter != "All") {
+      data <- data |> filter(event_category == input$event_filter)
+    }
+    
+    # Filter by source category if a specific category is selected
+    if (input$source_filter != "All") {
+      data <- data |> filter(source_category == input$source_filter)
+    }
+    
+    # Format the state and city columns to have only the first letter in uppercase
+    data <- data |> 
+      mutate(
+        state = stringr::str_to_title(state),
+        city = stringr::str_to_title(city)
+      )
+    
+    # Return the filtered dataset
+    data
+  })
+  
+  # Render a data table with the filtered data
+  output$filtered_table <- renderDT({
+    datatable(
+      filtered_data(), 
+      options = list(pageLength = 10, scrollX = TRUE))
+  })
+  
+  # Download handler for exporting the filtered data
+  output$download_data <- downloadHandler(
+    filename = function() {
+      paste("filtered_data_", Sys.time(), ".csv", sep = "")
+    },
+    content = function(file) {
+      # Write the filtered data to a CSV file
+      write.csv(filtered_data(), file, row.names = FALSE)
+    }
+  )
+  
+  # OCCUPATIONAL ILLNESS
+  
+  # Illnesses by State Analysis
+  output$state_plot_occ <- renderPlotly({
+    # Filter the data by the selected year and calculate the total injuries for each state
+    state_summary_occ <- occ_injuries_data |>
+      filter(year == input$year_occ) |>
+      group_by(state) |>
+      summarise(Total_Injuries = sum(total_injuries, na.rm = TRUE), .groups = "drop")
+      
+    # Load US state map data
+    us_states <- map_data("state")
+    
+    # Merge the summarized injury data with the US map data by matching the "state" and "region" columns
+    map_data_combined <- us_states |>
+      left_join(state_summary_occ, by = c("region" = "state"))
+    
+    # Create hover text for displaying additional information when hovering over a state in the map
+    map_data_combined$hover_text <- paste(
+      "State:", map_data_combined$region,
+      "<br>Total Injuries:", map_data_combined$Total_Injuries
+    )
+    
+    # Create the map plot using ggplot
+    p <- ggplot(map_data_combined, aes(
+      x = long, y = lat, group = group, fill = Total_Injuries, text = hover_text
+    )) +
+      geom_polygon(color = "white") +
+      coord_fixed(1.3) +
+      scale_fill_gradient(low = "#336699", high = "#003366", na.value = "grey50") +
+      labs(
+        title = paste("Total Occupational Illness by State for", input$year_occ),
+        fill = "Total Injuries"
+      ) +
+      theme_minimal() +
+      theme(
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid = element_blank(),
+        plot.title = element_text(
+          hjust = 0.5,
+          size = 16,
+          face = "bold"
+        )
+      )
+    # Convert the ggplot to interactive plotly plot
+    ggplotly(p, tooltip = "text") |>
+      layout(
+        hoverlabel = list(bgcolor = "white", font = list(size = 12)),
+        hovermode = "closest"
+      ) |>
+      config(
+        modeBarButtonsToRemove = c(
+          "pan2d", "select2d", "lasso2d", "autoScale2d", "resetScale2d", 
+          "hoverClosestCartesian", "hoverCompareCartesian", 
+          "zoom2d", "sendDataToCloud"
+        ),
+        displaylogo = FALSE  # Hide the Plotly logo
+      )
+  })
+  
+  # Top Occupational Industries Analysis
+  
+  # Render pie chart of the top 5 industries with the highest number of occupational injuries
+  output$industry_pie_chart_occ <- renderPlot({
+    # Filter data based on selected year, group by industry, and calculate total injuries per industry
+    industry_data <- occ_injuries_data |>
+      filter(year == input$year_industry_occ) |>
+      group_by(industry) |>
+      summarise(Total_Injuries = n()) |>
+      arrange(desc(Total_Injuries)) |>
+      mutate(Percentage = round((Total_Injuries / sum(Total_Injuries)) * 100, 1)) |>
+      slice(1:5)
+    
+    custom_colors <- c("#336699", "#003366", "#4d4d4d", "#99ccff", "#1a1a1a")
+    
+    # Create pie chart with custom colors and labels
+    ggplot(industry_data, aes(x = "", y = Total_Injuries, fill = industry)) +
+      geom_bar(stat = "identity", width = 1, color = "white") +
+      coord_polar(theta = "y") +
+      geom_text(aes(label = paste0(Percentage, "%")),
+                position = position_stack(vjust = 0.5), size = 5, color = "white") +
+      labs(
+        title = paste("Top 5 Industries for Occupational Injuries in", input$year_industry_occ),
+        fill = "Industry"
+      ) +
+      theme_void() +
+      theme(
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 20),
+        legend.title = element_text(face = "bold"),
+        legend.text = element_text(size = 10)
+      ) +
+      scale_fill_manual(values = custom_colors)
+  })
+  
+  # Render table showing total injuries and percentage of injuries by industry
+  output$industry_table_occ <- renderTable({
+    # Calculate total number of injuries for the selected year
+    total_injuries <- occ_injuries_data |>
+      filter(year == input$year_industry_occ) |>
+      summarise(Total_Injuries = n()) |>
+      pull(Total_Injuries)
+    
+    # Summarize injuries by industry, calculate percentage for each industry
+    industry_data <- occ_injuries_data |>
+      filter(year == input$year_industry_occ) |>
+      group_by(industry) |>
+      summarise(Total_Injuries = n()) |>
+      arrange(desc(Total_Injuries)) |>
+      mutate(Percentage = round((Total_Injuries / total_injuries) * 100, 1)) |>
+      rename(
+        `Industry` = industry,
+        `Total Injuries` = Total_Injuries,
+        `Percentage (%)` = Percentage
+      )
+    # Return the summarized data as a table
+    industry_data
+  })
+  
+  # Download the top industries pie chart as a PNG image
+  output$download_industry_plot_occ <- downloadHandler(
+    # Define filename format for the downloaded image
+    filename = function() {
+      paste("top_occ_industries_pie_chart_", Sys.time(), ".png", sep = "")
+    },
+    content = function(file) {
+      # Generate the top 5 industries data for the pie chart
+      industry_data <- occ_injuries_data |>
+        filter(year == input$year_industry_occ) |>
+        group_by(industry) |>
+        summarise(Total_Injuries = n()) |>
+        arrange(desc(Total_Injuries)) |>
+        mutate(Percentage = round((Total_Injuries / sum(Total_Injuries)) * 100, 1)) |>
+        slice(1:5)
+      
+      custom_colors <- c("#336699", "#003366", "#4d4d4d", "#99ccff", "#1a1a1a")
+      
+      # Create pie chart plot
+      p <- ggplot(industry_data, aes(x = "", y = Total_Injuries, fill = industry)) +
+        geom_bar(stat = "identity", width = 1, color = "white") +
+        coord_polar(theta = "y") +
+        geom_text(aes(label = paste0(Percentage, "%")),
+                  position = position_stack(vjust = 0.5), size = 5, color = "white") +
+        labs(
+          title = paste("Top 5 Industries for Occupational Injuries in", input$year_industry_occ),
+          fill = "Industry"
+        ) +
+        theme_void() +
+        theme(
+          plot.title = element_text(hjust = 0.5, face = "bold", size = 20),
+          legend.title = element_text(face = "bold"),
+          legend.text = element_text(size = 10)
+        ) +
+        scale_fill_manual(values = custom_colors)
+      
+      # Save the plot as a PNG file
+      ggsave(file, plot = p, width = 8, height = 6, dpi = 300)
+    }
+  )
+  
+  
+  # Top States Analysis
+  
+  # Render the plot for the top 5 states by total occupational illness
+  output$top_states_plot_occ <- renderPlot({
+    # Filter data by the selected year and calculate total injuries for each state
+    top_states <- occ_injuries_data |>
+      filter(year == input$year_state_occ) |>
+      group_by(state) |>
+      summarise(Total_Injuries = n()) |>
+      mutate(state = stringr::str_to_title(state)) |>
+      arrange(desc(Total_Injuries)) |>
+      slice(1:5)
+    custom_colors <- c("#336699", "#003366", "#4d4d4d", "#99ccff", "#1a1a1a")
+    
+    # Create a bar chart for the top 5 states by total injuries
+    ggplot(top_states, aes(x = reorder(state, Total_Injuries), y = Total_Injuries, fill = state)) +
+      geom_col(show.legend = FALSE) +
+      coord_flip() +
+      labs(
+        title = paste("Top 5 States by Total Occupational Illness in", input$year_state_occ),
+        x = "State",
+        y = "Total Illness"
+      ) +
+      theme_minimal() +
+      theme(
+        plot.title = element_text(hjust = 0.5, face = "bold", size = 20),
+        axis.title.x = element_text(face = "bold", size = 14),
+        axis.title.y = element_text(face = "bold",size = 14),
+        axis.text.x = element_text(face = "bold", size = 12),
+        axis.text.y = element_text(face = "bold", size = 12)
+      ) +
+      scale_fill_manual(values = custom_colors) +
+      scale_y_continuous(labels = scales::comma)
+  })
+  
+  # Render a table for all the states
+  output$states_table_occ <- renderTable({
+    all_states <- occ_injuries_data |>
+      filter(year == input$year_state_occ) |>
+      group_by(state) |>
+      summarise(
+        Total_Injuries = n()) |>
+      mutate(state = stringr::str_to_title(state)) |>
+      arrange(desc(Total_Injuries)) |>
+      rename(
+        `State` = state,
+        `Total Injuries` = Total_Injuries
+      )
+    # Return the table for all the states
+    all_states
+  })
+  
+  # Download handler for the top states plot
+  output$download_top_states_plot_occ <- downloadHandler(
+    filename = function() {
+      paste("top_states_plot_", Sys.time(), ".png", sep = "")
+    },
+    content = function(file) {
+      top_states <- occ_injuries_data |>
+        filter(year == input$year_state_occ) |>
+        group_by(state) |>
+        summarise(Total_Injuries = n()) |>
+        mutate(state = stringr::str_to_title(state)) |>
+        arrange(desc(Total_Injuries)) |>
+        slice(1:5)
+      custom_colors <- c("#336699", "#003366", "#4d4d4d", "#99ccff", "#1a1a1a")
+      
+      # Create the plot for the top 5 states
+      p <- ggplot(top_states, aes(x = reorder(state, Total_Injuries), y = Total_Injuries, fill = state)) +
+        geom_col(show.legend = FALSE) +
+        coord_flip() +
+        labs(
+          title = paste("Top 5 States by Total Occupational Illness in", input$year_state_occ),
+          x = "State",
+          y = "Total Illness"
+        ) +
+        theme_minimal() +
+        theme(
+          plot.title = element_text(hjust = 0.5, face = "bold", size = 20),
+          axis.title.x = element_text(face = "bold", size = 14),
+          axis.title.y = element_text(face = "bold",size = 14),
+          axis.text.x = element_text(face = "bold", size = 12),
+          axis.text.y = element_text(face = "bold", size = 12)
+        ) +
+        scale_fill_manual(values = custom_colors) +
+        scale_y_continuous(labels = scales::comma)
+      
+      # Save the plot as a PNG file
+      ggsave(file, plot = p, width = 8, height = 6, dpi = 300)
+    }
+  )
+  
+  # Key Injury Metric by Industry
+  
+  # Render dynamic title for the occupational illness visualization based on the selected industry
+  output$dynamic_title <- renderUI({
+    title <- paste("Occupational Illness Visualization for", input$select_industry_occ, "in", input$year_filter_industry_occ)
+    
+    div(
+      style = "text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 5px;",
+      title
+    )
+  })
+  
+  # Reactive data filtering based on the selected industry and year
+  filtered_data_occ <- reactive({
+    data <- occ_injuries_data |>
+      filter(year == input$year_filter_industry_occ)
+    
+    # Filter the data by industry if selected
+    if (input$select_industry_occ != "All Industries") {
+      data <- data |> filter(industry == input$select_industry_occ)
+    }
+    
+    return(data)
+  })
+
+  # Render plot for employee details such as average employees and hours worked
+  output$illness_employees_plot_occ <- renderPlot({
+    data <- filtered_data_occ() |>
+      summarise(
+        Avg_Employees = sum(annual_average_employees, na.rm = TRUE),
+        Hours_Worked = sum(total_hours_worked, na.rm = TRUE)
+      )
+    
+    bar_data <- gather(data, key = "Metric", value = "Value")
+    custom_colors <- c("#336699", "#003366")
+    
+    # Create a bar plot with labels and formatting
+    ggplot(bar_data, aes(x = Metric, y = Value, fill = Metric)) +
+      geom_bar(stat = "identity", show.legend = FALSE) +
+      geom_text(aes(label = scales::comma(Value)),
+                vjust = -0.5, size = 4, fontface = "bold") +
+      scale_y_continuous(labels = scales::comma) +
+      labs(title = "Employee Details", x = NULL, y = "Value") +
+      theme_minimal() +
+      theme(
+        plot.title = element_text(hjust = 0.5, vjust = 1, face = "bold", size = 16),
+        axis.title.y = element_text(face = "bold", size = 14),
+        axis.text = element_text(face = "bold", size = 12),
+        axis.text.x = element_text(angle = 0, hjust = 0.5),
+        panel.border = element_rect(color = "black", fill = NA, linewidth = 1.5),
+        plot.margin = margin(20, 20, 20, 20)
+      ) +
+      scale_fill_manual(values = custom_colors)
+  })
+  
+  # Render plot for illness and death statistics
+  output$illness_deaths_plot_occ <- renderPlot({
+    data <- filtered_data_occ() |>
+      summarise(
+        Deaths = sum(total_deaths, na.rm = TRUE),
+        Illnesses = sum(total_injuries, na.rm = TRUE)
+      )
+    
+    bar_data <- gather(data, key = "Metric", value = "Value")
+    custom_colors <- c("#336699", "#003366")
+    
+    # Create a bar plot with illness and death counts
+    ggplot(bar_data, aes(x = Metric, y = Value, fill = Metric)) +
+      geom_bar(stat = "identity", show.legend = FALSE) +
+      geom_text(aes(label = scales::comma(Value)),
+                vjust = -0.5, size = 4, fontface = "bold") +
+      scale_y_continuous(labels = scales::comma) +
+      labs(title = "Count of Illness", x = NULL, y = "Value") +
+      theme_minimal() +
+      theme(
+        plot.title = element_text(hjust = 0.5, vjust = 1, face = "bold", size = 16),
+        axis.title.y = element_text(face = "bold", size = 14),
+        axis.text = element_text(face = "bold", size = 12),
+        axis.text.x = element_text(angle = 0, hjust = 0.5),
+        panel.border = element_rect(color = "black", fill = NA, linewidth = 1.5),
+        plot.margin = margin(20, 20, 20, 20)
+      ) +
+      scale_fill_manual(values = custom_colors)
+  })
+  
+  # Render plot for various case types such as DAFW, DJTR, and others
+  output$illness_cases_plot_occ <- renderPlot({
+    data <- filtered_data_occ() |>
+      summarise(
+        DAFW_Cases = sum(total_dafw_cases, na.rm = TRUE),
+        DJTR_Cases = sum(total_djtr_cases, na.rm = TRUE),
+        Other_Cases = sum(total_other_cases, na.rm = TRUE)
+      )
+    
+    bar_data <- gather(data, key = "Case_Type", value = "Value")
+    custom_colors <- c("#336699", "#003366", "#4d4d4d")
+    
+    # Create a bar plot with case type counts
+    ggplot(bar_data, aes(x = Case_Type, y = Value, fill = Case_Type)) +
+      geom_bar(stat = "identity", show.legend = FALSE) +
+      geom_text(aes(label = scales::comma(Value)),
+                vjust = -0.5, size = 4, fontface = "bold") +
+      scale_y_continuous(labels = scales::comma) +
+      labs(title = "Different Cases", x = NULL, y = "Value") +
+      theme_minimal() +
+      theme(
+        plot.title = element_text(hjust = 0.5, vjust = 1, face = "bold", size = 16),
+        axis.title.y = element_text(face = "bold", size = 14),
+        axis.text = element_text(face = "bold", size = 12),
+        axis.text.x = element_text(angle = 0, hjust = 0.5),
+        panel.border = element_rect(color = "black", fill = NA, linewidth = 1.5),
+        plot.margin = margin(20, 20, 20, 20)
+      ) +
+      scale_fill_manual(values = custom_colors)
+  })
+  
+  # Render plot for time duration statistics (DAFW and DJTR days)
+  output$illness_days_plot_occ <- renderPlot({
+    data <- filtered_data_occ() |>
+      summarise(
+        DAFW_Days = sum(total_dafw_days, na.rm = TRUE),
+        DJTR_Days = sum(total_djtr_days, na.rm = TRUE)
+      )
+    
+    bar_data <- gather(data, key = "Days_Type", value = "Value")
+    custom_colors <- c("#336699", "#003366")
+    
+    # Create a bar plot with time duration counts
+    ggplot(bar_data, aes(x = Days_Type, y = Value, fill = Days_Type)) +
+      geom_bar(stat = "identity", show.legend = FALSE) +
+      geom_text(aes(label = scales::comma(Value)),
+                vjust = -0.5, size = 4, fontface = "bold") +
+      scale_y_continuous(labels = scales::comma) +
+      labs(title = "Time Duration", x = NULL, y = "Days") +
+      theme_minimal() +
+      theme(
+        plot.title = element_text(hjust = 0.5, vjust = 1, face = "bold", size = 16),
+        axis.title.y = element_text(face = "bold", size = 14),
+        axis.text = element_text(face = "bold", size = 12),
+        axis.text.x = element_text(angle = 0, hjust = 0.5),
+        panel.border = element_rect(color = "black", fill = NA, linewidth = 1.5),
+        plot.margin = margin(20, 20, 20, 20)
+      ) +
+      scale_fill_manual(values = custom_colors)
+  })
+  
+  # Render plot for illness categories and total illness cases
+  output$illness_categories_plot_occ <- renderPlot({
+    data <- filtered_data_occ() |>
+      summarise(
+        Poisonings = sum(total_poisonings, na.rm = TRUE),
+        Respiratory = sum(total_respiratory_conditions, na.rm = TRUE),
+        Skin_Disorders = sum(total_skin_disorders, na.rm = TRUE),
+        Hearing_Loss = sum(total_hearing_loss, na.rm = TRUE),
+        Other = sum(total_other_illnesses, na.rm = TRUE)
+      )
+    
+    bar_data <- gather(data, key = "Illness_Type", value = "Value")
+    custom_colors <- c("#336699", "#003366", "#4d4d4d", "#99ccff", "#1a1a1a")
+    
+    # Create a bar plot for illness categories and illness cases
+    ggplot(bar_data, aes(x = Illness_Type, y = Value, fill = Illness_Type)) +
+      geom_bar(stat = "identity", show.legend = FALSE) +
+      geom_text(aes(label = scales::comma(Value)),
+                vjust = -0.5, size = 4, fontface = "bold") +
+      scale_y_continuous(labels = scales::comma) +
+      labs(title = "Illness Categories vs Illness", x = NULL, y = "Total Illness") +
+      theme_minimal() +
+      theme(
+        plot.title = element_text(hjust = 0.5, vjust = 1, face = "bold", size = 16),
+        axis.title.y = element_text(face = "bold", size = 14),
+        axis.text = element_text(face = "bold", size = 12),
+        axis.text.x = element_text(angle = 0, hjust = 0.5),
+        panel.border = element_rect(color = "black", fill = NA, linewidth = 1.5),
+        plot.margin = margin(20, 20, 20, 20)
+      ) +
+      scale_fill_manual(values = custom_colors)
+  })
+  
+  output$download_industry_interactive_plots <- downloadHandler(
+    # Define the file name for the downloaded PDF
+    filename = function() {
+      paste("Summary_Plots", Sys.time(), ".pdf", sep = "")
+    },
+    content = function(file) {
+      # Open a PDF device to save the plots
+      pdf(file, width = 8, height = 6)  # Open a PDF device
+      custom_colors <- c("#336699", "#003366", "#4d4d4d", "#99ccff", "#1a1a1a")
+      
+      # Render dynamic title for the report
+      output$dynamic_title <- renderUI({
+        title <- paste("Occupational Illness Visualization for", input$select_industry_occ, "in", input$year_filter_industry_occ)
+        
+        div(
+          style = "text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 5px;",
+          title
+        )
+      })
+      
+      # Plot 1: Annual Average Employees, Total Hours Worked
+      data1 <- filtered_data_occ() |>
+        summarise(
+          Avg_Employees = sum(annual_average_employees, na.rm = TRUE),
+          Hours_Worked = sum(total_hours_worked, na.rm = TRUE)
+        )
+      bar_data1 <- gather(data1, key = "Metric", value = "Value")
+      plot1 <- ggplot(bar_data1, aes(x = Metric, y = Value, fill = Metric)) +
+        geom_bar(stat = "identity", show.legend = FALSE) +
+        geom_text(aes(label = scales::comma(Value)), vjust = -0.5, size = 3) +
+        scale_y_continuous(labels = scales::comma) +
+        labs(title = "Employee Details", x = NULL, y = "Value") +
+        theme_minimal() +
+        theme(
+          plot.title = element_text(hjust = 0.5, vjust = 1, face = "bold", size = 16),
+          axis.title.y = element_text(face = "bold", size = 14),
+          axis.text = element_text(face = "bold", size = 12),
+          axis.text.x = element_text(angle = 0, hjust = 0.5),
+          panel.border = element_rect(color = "black", fill = NA, linewidth = 1.5),
+          plot.margin = margin(20, 20, 20, 20)
+        ) +
+        scale_fill_manual(values = custom_colors)
+      print(plot1)
+      
+      # Plot 2: Total Deaths and Total Injuries
+      data2 <- filtered_data_occ() |>
+        summarise(
+          Deaths = sum(total_deaths, na.rm = TRUE),
+          Injuries = sum(total_injuries, na.rm = TRUE)
+        )
+      bar_data2 <- gather(data2, key = "Metric", value = "Value")
+      plot2 <- ggplot(bar_data2, aes(x = Metric, y = Value, fill = Metric)) +
+        geom_bar(stat = "identity", show.legend = FALSE) +
+        geom_text(aes(label = scales::comma(Value)), vjust = -0.5, size = 3) +
+        scale_y_continuous(labels = scales::comma) +
+        labs(title = "Count of Illness", x = NULL, y = "Value") +
+        theme_minimal() +
+        theme(
+          plot.title = element_text(hjust = 0.5, vjust = 1, face = "bold", size = 16),
+          axis.title.y = element_text(face = "bold", size = 14),
+          axis.text = element_text(face = "bold", size = 12),
+          axis.text.x = element_text(angle = 0, hjust = 0.5),
+          panel.border = element_rect(color = "black", fill = NA, linewidth = 1.5),
+          plot.margin = margin(20, 20, 20, 20)
+        ) +
+        scale_fill_manual(values = custom_colors)
+      print(plot2)
+      
+      # Plot 3: DAFW Cases, DJTR Cases, Other Cases
+      data3 <- filtered_data_occ() |>
+        summarise(
+          DAFW_Cases = sum(total_dafw_cases, na.rm = TRUE),
+          DJTR_Cases = sum(total_djtr_cases, na.rm = TRUE),
+          Other_Cases = sum(total_other_cases, na.rm = TRUE)
+        )
+      bar_data3 <- gather(data3, key = "Case_Type", value = "Value")
+      plot3 <- ggplot(bar_data3, aes(x = Case_Type, y = Value, fill = Case_Type)) +
+        geom_bar(stat = "identity", show.legend = FALSE) +
+        geom_text(aes(label = scales::comma(Value)), vjust = -0.5, size = 3) +
+        scale_y_continuous(labels = scales::comma) +
+        labs(title = "Different Cases", x = NULL, y = "Value") +
+        theme_minimal() +
+        theme(
+          plot.title = element_text(hjust = 0.5, vjust = 1, face = "bold", size = 16),
+          axis.title.y = element_text(face = "bold", size = 14),
+          axis.text = element_text(face = "bold", size = 12),
+          axis.text.x = element_text(angle = 0, hjust = 0.5),
+          panel.border = element_rect(color = "black", fill = NA, linewidth = 1.5),
+          plot.margin = margin(20, 20, 20, 20)
+        ) +
+        scale_fill_manual(values = custom_colors)
+      print(plot3)
+      
+      # Plot 4: DAFW Days, DJTR Days
+      data4 <- filtered_data_occ() |>
+        summarise(
+          DAFW_Days = sum(total_dafw_days, na.rm = TRUE),
+          DJTR_Days = sum(total_djtr_days, na.rm = TRUE)
+        )
+      bar_data4 <- gather(data4, key = "Days_Type", value = "Value")
+      plot4 <- ggplot(bar_data4, aes(x = Days_Type, y = Value, fill = Days_Type)) +
+        geom_bar(stat = "identity", show.legend = FALSE) +
+        geom_text(aes(label = scales::comma(Value)), vjust = -0.5, size = 3) +
+        scale_y_continuous(labels = scales::comma) +
+        labs(title = "Time Duration", x = NULL, y = "Days") +
+        theme_minimal() +
+        theme(
+          plot.title = element_text(hjust = 0.5, vjust = 1, face = "bold", size = 16),
+          axis.title.y = element_text(face = "bold", size = 14),
+          axis.text = element_text(face = "bold", size = 12),
+          axis.text.x = element_text(angle = 0, hjust = 0.5),
+          panel.border = element_rect(color = "black", fill = NA, linewidth = 1.5),
+          plot.margin = margin(20, 20, 20, 20)
+        ) +
+        scale_fill_manual(values = custom_colors)
+      print(plot4)
+      
+      # Plot 5: Illness Categories
+      data5 <- filtered_data_occ() |>
+        summarise(
+          Poisonings = sum(total_poisonings, na.rm = TRUE),
+          Respiratory = sum(total_respiratory_conditions, na.rm = TRUE),
+          Skin_Disorders = sum(total_skin_disorders, na.rm = TRUE),
+          Hearing_Loss = sum(total_hearing_loss, na.rm = TRUE),
+          Other = sum(total_other_illnesses, na.rm = TRUE)
+        )
+      bar_data5 <- gather(data5, key = "Illness_Type", value = "Value")
+      plot5 <- ggplot(bar_data5, aes(x = Illness_Type, y = Value, fill = Illness_Type)) +
+        geom_bar(stat = "identity", show.legend = FALSE) +
+        geom_text(aes(label = scales::comma(Value)), vjust = -0.5, size = 3) +
+        scale_y_continuous(labels = scales::comma) +
+        labs(title = "Illness Categories vs Illness", x = NULL, y = "Total Illness") +
+        theme_minimal() +
+        theme(
+          plot.title = element_text(hjust = 0.5, vjust = 1, face = "bold", size = 16),
+          axis.title.y = element_text(face = "bold", size = 14),
+          axis.text = element_text(face = "bold", size = 12),
+          axis.text.x = element_text(angle = 0, hjust = 0.5),
+          panel.border = element_rect(color = "black", fill = NA, linewidth = 1.5),
+          plot.margin = margin(20, 20, 20, 20)
+        ) +
+        scale_fill_manual(values = custom_colors)
+      print(plot5)
+      
+      # Close the PDF device to finish saving the plots
+      dev.off()
+    }
+  )
+  
+  # Interactive Filters for Occupational Illness
+  
+  # Reactive expression to filter the dataset based on user inputs
+  filtered_data_table_occ <- reactive({
+    # Start with the full dataset of occupational injuries
+    data <- occ_injuries_data
+    
+    # Filter data by the selected year
+    data <- data |> filter(year == input$year_filter_occ)
+    
+    # Filter the data by industry if selected
+    if (input$industry_filter_occ != "All Industries") {
+      data <- data |> filter(industry == input$industry_filter_occ)
+    }
+    
+    # Filter the data by state if selected
+    if (input$state_filter_occ != "All States") {
+      data <- data |> filter(state == input$state_filter_occ)
+    }
+    
+    # Filter data based on whether the injury/illness type is selected as 'Yes' (1) or 'No' (2)
+    if (input$illness_injuries_filter_occ == "Yes") {
+      data <- data |> filter(injury_illness == 1)
+    } else {
+      data <- data |> filter(injury_illness == 2)
+    }
+    
+    # Filter data based on respiratory conditions
+    if (input$respiratory_conditions_filter_occ == "No") {
+      data <- data |> filter(total_respiratory_conditions == 0)
+    } else {
+      data <- data |> filter(total_respiratory_conditions > 0)
+    }
+    
+    # Filter data based on skin disorders
+    if (input$skin_disorder_filter_occ == "Yes") {
+      data <- data |> filter(total_skin_disorders > 1)
+    } else {
+      data <- data |> filter(total_skin_disorders == 0)
+    }
+    
+    # Filter data based on hearing loss
+    if (input$hearing_loss_filter_occ == "Yes") {
+      data <- data |> filter(total_hearing_loss > 1)
+    } else {
+      data <- data |> filter(total_hearing_loss == 0)
+    }
+    
+    # Filter data based on other illnesses
+    if (input$other_illness_filter_occ == "Yes") {
+      data <- data |> filter(total_other_illnesses > 1)
+    } else {
+      data <- data |> filter(total_other_illnesses == 0)
+    }
+    
+    # Format the state column to have only the first letter in uppercase
+    data <- data |> 
+      mutate(state = stringr::str_to_title(state))
+    
+    # Return the filtered dataset
+    return(data)
+  })
+  
+  # Render the filtered data table based on the user-selected filters
+  output$filtered_table_occ <- renderDT({
+    datatable(
+      # Render the datatable with filtered data
+      filtered_data_table_occ(),
+      options = list(pageLength = 10, scrollX = TRUE),
+      rownames = FALSE
+    )
+  })
+  
+  # Download handler to export the filtered data as a CSV file
+  output$download_occ_data <- downloadHandler(
+    filename = function() {
+      paste("filtered_data_", Sys.time(), ".csv", sep = "")
+    },
+    # Write the filtered data to the CSV file
+    content = function(file) {
+      write.csv(filtered_data_table_occ(), file, row.names = FALSE)
+    }
+  )
+}
+
+# Run the Shiny app
+shinyApp(ui = ui, server = server)
+```

@@ -1,0 +1,189 @@
+# Data Cleaning for Severe Injuries
+
+# Author: Saritha Kumari Krishna Reddy, Stephanie Ajah, Karanvir Virdi
+
+# Date: Dec 12, 2024
+
+# Load necessary libraries
+library(tidyverse)
+library(readxl)
+
+# Read the Excel files
+injury_data <- readxl::read_xlsx('/Users/sarithakumarik/Documents/DATA6200/FinalProject/Dataset/SevereInjuryData.xlsx')
+
+# Dropping NA and irrelevant values from industry columns
+injury_data <- injury_data[!is.na(injury_data$`Primary NAICS`) & injury_data$`Primary NAICS` != 999999, ]
+
+# Extract only the year and create a new column
+injury_data$event_date <- as.Date(injury_data$EventDate, format = "%m/%d/%Y")
+injury_data$year <- format(injury_data$event_date, "%Y")
+
+# Categorization of 'PRIMARY NAICS' column
+injury_data <- injury_data |>
+  rowwise() |>
+  mutate(industry = case_when(
+    str_detect(`Primary NAICS`, regex("^11", ignore_case = TRUE)) ~ "Agriculture, Forestry, Fishing and Hunting",
+    str_detect(`Primary NAICS`, regex("^21", ignore_case = TRUE)) ~ "Mining, Quarrying, and Oil and Gas Extraction",
+    str_detect(`Primary NAICS`, regex("^22", ignore_case = TRUE)) ~ "Utilities",
+    str_detect(`Primary NAICS`, regex("^23", ignore_case = TRUE)) ~ "Construction",
+    str_detect(`Primary NAICS`, regex("^31|32|33", ignore_case = TRUE)) ~ "Manufacturing",
+    str_detect(`Primary NAICS`, regex("^42", ignore_case = TRUE)) ~ "Wholesale Trade",
+    str_detect(`Primary NAICS`, regex("^44|45", ignore_case = TRUE)) ~ "Retail Trade",
+    str_detect(`Primary NAICS`, regex("^48|49", ignore_case = TRUE)) ~ "Transportation and Warehousing",
+    str_detect(`Primary NAICS`, regex("^51", ignore_case = TRUE)) ~ "Information",
+    str_detect(`Primary NAICS`, regex("^52", ignore_case = TRUE)) ~ "Finance and Insurance",
+    str_detect(`Primary NAICS`, regex("^53", ignore_case = TRUE)) ~ "Real Estate and Rental and Leasing",
+    str_detect(`Primary NAICS`, regex("^54", ignore_case = TRUE)) ~ "Professional, Scientific, and Technical Services",
+    str_detect(`Primary NAICS`, regex("^56", ignore_case = TRUE)) ~ "Administrative and Support and Waste Management and Remediation Services",
+    str_detect(`Primary NAICS`, regex("^61", ignore_case = TRUE)) ~ "Educational Services",
+    str_detect(`Primary NAICS`, regex("^62", ignore_case = TRUE)) ~ "Health Care and Social Assistance",
+    str_detect(`Primary NAICS`, regex("^71", ignore_case = TRUE)) ~ "Arts, Entertainment, and Recreation",
+    str_detect(`Primary NAICS`, regex("^72", ignore_case = TRUE)) ~ "Accommodation and Food Services",
+    str_detect(`Primary NAICS`, regex("^81", ignore_case = TRUE)) ~ "Other Services (except Public Administration)",
+    str_detect(`Primary NAICS`, regex("^92", ignore_case = TRUE)) ~ "Public Administration",
+    TRUE ~ "Uncategorized"
+  ))
+
+# Categorization of 'Nature' column
+injury_data <- injury_data |>
+  rowwise() |>
+  mutate(nature_category = case_when(
+    str_detect(as.character(Nature), regex("111|1839|1834|1832|1210|1833|1831|1212|1830|1219|1218|6121|1823|1824|1825", ignore_case = TRUE)) ~ "Fractures",
+    str_detect(as.character(Nature), regex("1522|1520|150|1510|1590|1530|1533|1523|1512|1532|1849|1729|1725|1531|1720|1529|1513|1521|1722|1721|1728|1592|1723|1840|1841|1712|1511|5161|1593|1591|1599|1538", ignore_case = TRUE)) ~ "Burns",
+    str_detect(as.character(Nature), regex("10|1120|110|189|120|124|180|1999|129|1130|1139|128|190|118|119|1129|1991|100|199", ignore_case = TRUE)) ~ "Traumatic",
+    str_detect(as.character(Nature), regex("1972|1974|102", ignore_case = TRUE)) ~ "Soreness",
+    str_detect(as.character(Nature), regex("1311|1312|1310|1220|1319|1221|1222", ignore_case = TRUE)) ~ "Amputations",
+    str_detect(as.character(Nature), regex("193", ignore_case = TRUE)) ~ "Electrocution",
+    str_detect(as.character(Nature), regex("133|132|134|140|130|139|138|148|125|121", ignore_case = TRUE)) ~ "Wounds",
+    str_detect(as.character(Nature), regex("191|1963|5169|240|2443", ignore_case = TRUE)) ~ "Breathing",
+    str_detect(as.character(Nature), regex("1231|1233|1230|1229|1238|1442|1441|1440", ignore_case = TRUE)) ~ "Tears",
+    str_detect(as.character(Nature), regex("160|162|1681|161|169|1680|1689|185|2362|1113|1112|1111|1811|1110|1119", ignore_case = TRUE)) ~ "Brain",
+    str_detect(as.character(Nature), regex("5115|5110|1978|9999|1973|5174|5111|3299|1979|58|5164|2731|7|2432|5118|5119|518|239|8|3310|5131|5113|5114|21|3291|369|2383|232", ignore_case = TRUE)) ~ "General",
+    str_detect(as.character(Nature), regex("141|181|143", ignore_case = TRUE)) ~ "Abrasions, scratches",
+    str_detect(as.character(Nature), regex("1971|103", ignore_case = TRUE)) ~ "Crush",
+    str_detect(as.character(Nature), regex("2811|2810|1950|1952|1951|1958|1953", ignore_case = TRUE)) ~ "Skin",
+    str_detect(as.character(Nature), regex("1829|1232|1821|1822|1820", ignore_case = TRUE)) ~ "Sprains",
+    str_detect(as.character(Nature), regex("1966|1967|1960|1965|1969|1964|1968|168", ignore_case = TRUE)) ~ "Allergy",
+    str_detect(as.character(Nature), regex("2254", ignore_case = TRUE)) ~ "Vision",
+    str_detect(as.character(Nature), regex("2813", ignore_case = TRUE)) ~ "Infection",
+    str_detect(as.character(Nature), regex("194", ignore_case = TRUE)) ~ "Internal injuries",
+    str_detect(as.character(Nature), regex("1211|2723", ignore_case = TRUE)) ~ "Spinal",
+    str_detect(as.character(Nature), regex("1131|146", ignore_case = TRUE)) ~ "Nerves",
+    str_detect(as.character(Nature), regex("2361", ignore_case = TRUE)) ~ "Stroke",
+    str_detect(as.character(Nature), regex("5112", ignore_case = TRUE)) ~ "Seizures",
+    str_detect(as.character(Nature), regex("1961|161|162|163", ignore_case = TRUE)) ~ "Poisoning",
+    str_detect(as.character(Nature), regex("1962", ignore_case = TRUE)) ~ "Anaphylaxis",
+    str_detect(as.character(Nature), regex("142", ignore_case = TRUE)) ~ "Blisters",
+    str_detect(as.character(Nature), regex("1121", ignore_case = TRUE)) ~ "Paralysis",
+    str_detect(as.character(Nature), regex("2331|5159|2330|5151|2342|5150|2352|2359|5158|2492|2332|2449", ignore_case = TRUE)) ~ "Heart",
+    str_detect(as.character(Nature), regex("1733", ignore_case = TRUE)) ~ "Caisson disease, bends, divers' palsy",
+    str_detect(as.character(Nature), regex("2919|2910", ignore_case = TRUE)) ~ "Immunity",
+    str_detect(as.character(Nature), regex("6119|619|6110|6111|6113", ignore_case = TRUE)) ~ "Prosthetic devices",
+    str_detect(as.character(Nature), regex("6210|6219|6213", ignore_case = TRUE)) ~ "Anxiety",
+    str_detect(as.character(Nature), regex("2433", ignore_case = TRUE)) ~ "Influenza-novel",
+    str_detect(as.character(Nature), regex("1992", ignore_case = TRUE)) ~ "Embolism",
+    str_detect(as.character(Nature), regex("1711|1710|1719", ignore_case = TRUE)) ~ "Frostbite",
+    str_detect(as.character(Nature), regex("192", ignore_case = TRUE)) ~ "Drownings",
+    str_detect(as.character(Nature), regex("230", ignore_case = TRUE)) ~ "Circulatory",
+    str_detect(as.character(Nature), regex("310|30|320|3120|349", ignore_case = TRUE)) ~ "Bacterial",
+    str_detect(as.character(Nature), regex("2260", ignore_case = TRUE)) ~ "Hearing",
+    str_detect(as.character(Nature), regex("2459|2430|2431|2491", ignore_case = TRUE)) ~ "Pneumonia",
+    str_detect(as.character(Nature), regex("170|178|179", ignore_case = TRUE)) ~ "Environment",
+    TRUE ~ "Unknown"
+  ))
+
+# Categorization of 'Part of Body' column
+injury_data <- injury_data |>
+  rowwise() |>
+  mutate(body_part = case_when(
+    str_detect(as.character(`Part of Body`), regex("111|130|131|81|132|82|83|138|113|1369|118|1330|10|1368|18|139|21|134|135|112|1363|110|12|1360|119|1361|19|1362|811|125|1289|813|1241|812|123|120|122|127|126|28|823", ignore_case = TRUE)) ~ "Head",
+    str_detect(as.character(`Part of Body`), regex("320|341|20|333|310|330|322|38|342|315|311|30|344|331|318|328|3361|85|332|84|321|86|348|3462|340|82|323|343|3451|313|3353|39|833|3123|51|540|3112|832|834|3411|3330|3131|881|3342|3322|821|3412|324", ignore_case = TRUE)) ~ "Torso",
+    str_detect(as.character(`Part of Body`), regex("513|519|510|530|5830|532|511|5839|52|512|5811|5180|5181|50|582|5189|589|580|538|5819|539|5810|5313|5831|5310|5312|5318|59|5311|5319|53|522|520|5829|521|523|5850|5869|542|583|5281|548|5860|5851|5820|541|5289|5859|5861|5280", ignore_case = TRUE)) ~ "Leg",
+    str_detect(as.character(`Part of Body`), regex("4429|422|4422|420|43|423|4420|429|440|448|449|441|40|421|4421|484|4839|4830|4831|41|4289|482|489|4819|4281|4280|4811|4810|49|480|4428|485|428", ignore_case = TRUE)) ~ "Arms",
+    str_detect(as.character(`Part of Body`), regex("87|849|841", ignore_case = TRUE)) ~ "Limbs",
+    str_detect(as.character(`Part of Body`), regex("6|3329|883|3119", ignore_case = TRUE)) ~ "Body Systems",
+    str_detect(as.character(`Part of Body`), regex("9999|990", ignore_case = TRUE)) ~ "Unknown",
+    str_detect(as.character(`Part of Body`), regex("899|80", ignore_case = TRUE)) ~ "Multiple Parts",
+    str_detect(as.character(`Part of Body`), regex("891|888", ignore_case = TRUE)) ~ "Full Body",
+    str_detect(as.character(`Part of Body`), regex("912|911", ignore_case = TRUE)) ~ "Prosthetic",
+    TRUE ~ "Uncategorized"
+  ))
+
+# Categorization of 'Event' column
+injury_data <- injury_data |>
+  rowwise() |>
+  mutate(event_category = case_when(
+    str_detect(as.character(Event), regex("2219|2210|229|220|2151|2153|2124|219|210|217", ignore_case = TRUE)) ~ "Rail and Air Incidents",
+    str_detect(as.character(Event), regex("139|130|1381|1324|1319|1310|1322|1323|6213|1313|6222|1312|1313|1311|5548|2313|1321|1389|628", ignore_case = TRUE)) ~ "Animal-Related Incidents",
+    str_detect(as.character(Event), regex("7312|7311|7310|7314|7313|733|74|7399|57|732", ignore_case = TRUE)) ~ "Body Movements and Strain",
+    str_detect(as.character(Event), regex("7371|2731|2631|2732|2632|2614|2612|2611|2613|2737|2637", ignore_case = TRUE)) ~ "Boarding and Vehicle Incidents",
+    str_detect(as.character(Event), regex("640|6211|649|6411|6412|6419|6410|664|653|654|643|642|662|644|669|2721", ignore_case = TRUE)) ~ "Caught In or Compressed By Objects",
+    str_detect(as.character(Event), regex("562|553", ignore_case = TRUE)) ~ "Choking and Ingestion",
+    str_detect(as.character(Event), regex("634|639|656", ignore_case = TRUE)) ~ "Collapsing Structures and Engulfment",
+    str_detect(as.character(Event), regex("2713|2212|2211|2522|2521|2431|2723|222|257|2732|2733|2736|2735|2731|2739|2730|6319|270|279|2639|2630|20|2623|2621|2622|2529|259|250|251|239|2312|2319|2729|2610|2615|254|223", ignore_case = TRUE)) ~ "Collisions (Vehicle and Equipment)",
+    str_detect(as.character(Event), regex("60|620|534|533|660|69|619|6259|6250|6251|6619|6611|6612|6252|6321|6651|664|662|5551|6652", ignore_case = TRUE)) ~ "Contact with Objects or Equipment",
+    str_detect(as.character(Event), regex("1115|324|319|310|322|323|253|329|320|30|325|320|30|314|317|327|321|316|321|329|319|312|311|315|313|326", ignore_case = TRUE)) ~ "Explosions and Fires",
+    str_detect(as.character(Event), regex("5540|550|59|50|5211|558|550|5531|5522|5521|5520|531|5543|61|5541|532|541|563|661|990|666", ignore_case = TRUE)) ~ "Exposure to Harmful Substances",
+    str_detect(as.character(Event), regex("4319|4310|4312|422|4212|4213|4214|4219|4210|4311|4211|430|423|40|49|4323|4322|4324|4325|4326|4321|4327|4413|4411|4142|4141|4423|4424|4425|4426|4422|4421|4427|4420|4142|4143|4140|4333|4334|4335|4336|4332|4331|4337|4330|4111|4112|419|410|4119|4110|432|430|42|2323|2433|2244|2736|2636|4121|4122|4124|4123|4125|4129|4120|45|2734|256|258|225|224|4131|4113|4132|4133", ignore_case = TRUE)) ~ "Falls, Slips, and Trips",
+    str_detect(as.character(Event), regex("5112|5111|5110|5544|5553|513|5121|5122|5120|510", ignore_case = TRUE)) ~ "Exposure to Electricity",
+    str_detect(as.character(Event), regex("1149|1140|1141|1113|6311|6312|6322|6242|6230|6239|6214|6431|6233|6223|6432|6261|6269|6310|630|6659|6329|6320|6653|2638|2738|1329|1320|6249|6240|6241|6422|6441|6430|6239|6433|6231|6232|629|6439|6216|6215|6219|6210|640|6222|6221|6229|6220|655|663|652|651|659|650|2733|2633|6449|6269|6260|6213|6243|6212|659|650|655", ignore_case = TRUE)) ~ "Struck by or Hit Incidents",
+    str_detect(as.character(Event), regex("1119|1110|129|119|311|1211|1111|112|1114|1117|1212|1118|111", ignore_case = TRUE)) ~ "Violence/Intentional Harm",
+    str_detect(as.character(Event), regex("6253|1219|1210|1214|1215|1213", ignore_case = TRUE)) ~ "Unintentional Injury by Others",
+    str_detect(as.character(Event), regex("1229|1222|1221", ignore_case = TRUE)) ~ "Self-Inflicted Injuries",
+    str_detect(as.character(Event), regex("738|5548|718|78|7143|7132|7131|7130|7112|7111|7110|7113|7122|7121|7120|7142|7141|719|710|714|710|711|712|216|79|70|719|710", ignore_case = TRUE)) ~ "Overexertion and Physical Strain",
+    str_detect(as.character(Event), regex("2442|2512|2422|2412|2432|227|2501|2531|2511|2441|2421|2411|2431|211|249|240|736|7352|7351|2443|2413|7341|2439|2523", ignore_case = TRUE)) ~ "Pedestrian Incidents",
+    TRUE ~ "Uncategorized"
+  ))
+
+# Categorization of 'Source' column
+injury_data <- injury_data |>
+  rowwise() |>
+  mutate(source_category = case_when(
+    str_detect(as.character(Source), regex("10|19|1852|120|128|130|139|140|145|149|150|151|152|153|154|155|160|161|162|163|169|172|178|180|181|182|950|951|953|959|1110|1111|1112|1113|1114|1115|1118|1119|1120|1125|1128|1129|1210|1211|1212|1213|1214|1215|1219|1221|1229|1230|1233|1234|1235|1236|1239|1241|1243|1292|1295|1299|1310|1311|1314|1319|1320|1322|1329|1333|1341|1352|1434|1455|1460|1461|1463|1464|1469|1571|1620|1622|1629|1640|1641|1642|1643|1644|1649|1710|1711|1719|1731|1739|1740|1741|1742|1743|1749|1750|1751|1752|1759|1761|1763|1770|1771|1773|1779|1791|1793|1799|1830|1831|1832|1833|1834|1835|1838|1839|1840|1842|1843|1844|1849|1853|1899|147", ignore_case = TRUE)) ~ "Chemicals",
+    str_detect(as.character(Source), regex("70|210|216|217|218|219|220|229|344|345|347|420|423|429|430|432|433|439|443|449|454|616|710|720|730|731|732|733|739|740|741|749|750|754|755|757|759|771|772|773|775|777|779|792|799|872|873|874|875|2122|2123|2124|2125|2127|2249|3321|3323|3327|3610|3611|3613|3614|3615|3619|3622|3625|3627|3629|3711|3713|3714|3722|3910|3911|3919|3991|7111|7112|7113|7120|7121|7122|7123|7124|7125|7126|7127|7129|7130|7131|7132|7133|7140|7141|7142|7144|7149|7150|7151|7152|7154|7157|7159|7161|7165|7169|7171|7172|7173|7179|7181|7190|7191|7192|7193|7194|7199|7211|7213|7214|7219|7220|7221|7222|7223|7224|7225|7229|7231|7232|7233|7234|7235|7236|7239|7240|7241|7242|7243|7244|7249|7250|7252|7253|7254|7259|7260|7261|7269|7290|7291|7292|7293|7296|7299|7311|7312|7313|7319|7320|7321|7322|7323|7329|7330|7331|7332|7339|7341|7349|7350|7351|7352|7359|7366|7368|7369|7391|7399|7420|7931|7941|7951|6521|3253", ignore_case = TRUE)) ~ "Tools and Equipments",
+    str_detect(as.character(Source), regex("30|60|69|310|320|330|339|340|349|350|358|360|369|370|390|392|393|399|641|825|894|3110|3111|3116|3119|3120|3121|3122|3123|3125|3129|3130|3131|3132|3133|3139|3151|3159|3190|3192|3193|3199|3210|3211|3212|3213|3214|3215|3219|3220|3221|3222|3229|3230|3231|3232|3233|3234|3235|3236|3237|3239|3240|3242|3249|3250|3251|3252|3254|3255|3256|3257|3258|3259|3263|3290|3291|3292|3293|3299|3310|3320|3329|3330|3331|3341|3410|3411|3412|3413|3414|3416|3419|3420|3421|3422|3423|3424|3426|3427|3428|3429|3430|3431|3432|3433|3434|3435|3436|3437|3439|3440|3441|3442|3443|3449|3470|3472|3479|3492|3493|3499|3510|3511|3512|3513|3514|3519|3520|3521|3523|3524|3525|3529|3530|3532|3533|3534|3535|3539|3540|3541|3542|3545|3549|3550|3551|3552|3553|3559|3560|3561|3562|3563|3569|3570|3571|3572|3573|3579|3590|3592|3593|3594|3595|3599|3616|3624|3630|3631|3632|3633|3634|3639|3640|3642|3643|3650|3652|3659|3660|3661|3669|3670|3675|3691|3699|3710|3715|3716|3719|3720|3721|3729|3730|3731|3732|3733|3734|3739|3740|3741|3742|3743|3744|3745|3746|3749|3750|3751|3752|3753|3759|3760|3762|3763|3764|3765|3766|3769|3790|3791|3792|3795|3796|3797|3799|3992|3993|3994|3995|3996|3999|4412|3112|3113|3241|3243|3244|3322|3712|3253", ignore_case = TRUE)) ~ "Machinery",
+    str_detect(as.character(Source), regex("40|410|434|450|451|452|459|460|461|466|469|471|472|473|474|479|499|1121|1122|1123|1860|1861|1862|1869|1870|1871|1872|1879|1891|4110|4111|4112|4113|4114|4119|4120|4121|4122|4123|4124|4125|4129|4131|4132|4133|4134|4135|4136|4137|4138|4140|4141|4142|4143|4144|4145|4149|4150|4151|4152|4153|4154|4155|4159|4161|4162|4169|4171|4172|4173|4190|4192|4193|4194|4196|4197|4198|4199|4201|4203|4205|4210|4211|4212|4213|4214|4215|4216|4217|4219|4220|4221|4222|4223|4224|4225|4226|4229|4230|4232|4235|4233|4236|4241|4245|4246|4247|4251|4410|4411|4421|9211|9212|9213|9240|9241|9242|9243|9253|9254|9261|9262|9273|9274|9292|9296|9297|9299|9312|9410|9520|9521|9529|9533|9534|9541|9542|9552", ignore_case = TRUE)) ~ "Materials",
+    str_detect(as.character(Source), regex("2110|2111|2112|2113|2114|2115|2116|2117|2118|2119|2120|2121|2126|2129|2130|2132|2133|2139|2141|2142|2143|2149|2150|2153|2155|2157|2163|2210|2211|2212|2213|2214|2215|2216|2217|2218|2219|2221|2222|2223|2224|2230|2231|2232|2233|2234|2235|2236|2237|2238|2239|2240|2241|2242|2250|2251|2252|2253|2260|2261|2262|3311|3312|3313|3314|3319|3324|3325|3326|3332|3333|3334|3335|3339|4413|4414|4415|4416|4418|4417|4419|4420|4422|4423|4424|4425|4426|4427|4429|4431|4432|4439|4610|4611|4612|4615|4619|4621|4622|4624|4626|4628|4629|4631|4642|4643|4644|4645|4649|4651|4712|4713|4715|4716|4717|4719|4721|4723|4724|4726|4729|4741|4742|4749|4810|4812|4813|4814|4819|4820|4821|4823|4825|4826|4827|4829|4850|4851|4852|4853|4910|4911|4912|4919|7421|7422|7423|7424|7429|7431|7511|7512|7519|7530|7531|7532|7533|7539|7543|7611|7615|7619|7621|7631|7632|7633|7635|7636|7637|7639|2131|3336", ignore_case = TRUE)) ~ "Supplies",
+    str_detect(as.character(Source), regex("440|470|480|484|489|8110|8111|8112|8119|8120|8121|8132|8230|8234", ignore_case = TRUE)) ~ "Vehicle Supplies",
+    str_detect(as.character(Source), regex("80|483|810|820|821|822|823|829|830|831|832|833|834|835|837|838|839|840|851|860|863|869|870|871|879|890|891|892|893|899|8240|8244|8241|8249|8410|8411|8412|8413|8414|8415|8416|8417|8419|8420|8421|8422|8423|8424|8425|8426|8427|8428|8429|8430|8431|8432|8433|8434|8439|8440|8442|8443|8445|8446|8447|8610|8611|8612|8613|8614|8619|8620|8621|8622|8623|8624|8629|8630|8631|8633|8634|8639", ignore_case = TRUE)) ~ "Vehicle",
+    str_detect(as.character(Source), regex("20|29|914|915|919|930|931|932|939|3913|3914|9110|9111|9112|9114|9115|9116|9119|9132|9139", ignore_case = TRUE)) ~ "Assets",
+    str_detect(as.character(Source), regex("940|942|943|944|945|949|1284|9412|9413|9414|9415|9416|9419", ignore_case = TRUE)) ~ "Waste",
+    str_detect(as.character(Source), regex("610|611|613|620|627|628|629|630|631|632|633|636|639|649|650|653|654|655|656|657|658|659|660|3460|3461|3462|3463|3464|3465|3466|3467|3480|3481|3482|3489|3490|3491|3522|6122|6129|6131|6149|6170|6171|6172|6176|6177|6179|6181|6191|6199|6211|6212|6219|6222|6223|6229|6243|6250|6251|6254|6259|6333|6334|6335|6340|6341|6342|6343|6344|6345|6346|6349|6350|6351|6352|6353|6354|6359|6381|6382|6386|6391|6392|6393|6394|6395|6396|6397|6399|6510|6511|6512|6519|6520|6522|6523|6524|6529|6530|6531|6532|6540|6541|6542|6543|6544|6549|6550|6551|6552|6560|6561|6562|6569|6610|6611|6612|6613|6614|6620|6621|6622|6623|6624|6629|6630|6631|6632|6635|6636|6639|6640|6641|6642|6643|6650|6651|6652|6653|6660|6661|6662|6663|6671|6672|6673|6674|6675|6676|6690|6691|6692|6693|6694|6695|6699|6710|6711|6712|6719|6729|6733|6239", ignore_case = TRUE)) ~ "Infrastructure",
+    str_detect(as.character(Source), regex("510|512|529|530|531|533|540|545|580|582|583|584|586|5110|5111|5130|5131|5132|5133|5134|5135|5136|5140|5141|5142|5149|5150|5151|5152|5153|5154|5155|5156|5157|5158|5159|5211|5213|5214|5215|5219|5220|5460|5461|5462|5463|5871|5870|5872|5873|5879|5891|5899", ignore_case = TRUE)) ~ "Animals, Plants and Bacteria",
+    str_detect(as.character(Source), regex("541|549|550|552|553|554|555|556|557|558|920|9411|559", ignore_case = TRUE)) ~ "Environment",
+    str_detect(as.character(Source), regex("560|561|562|569|570|573|574|575|576|579|5710|5711|5712|5719|5720|5721|5722|5723|5724|5729|5732|5760|5761|5762|5763|5770|5771|5772|5773|5779", ignore_case = TRUE)) ~ "Humans",
+    str_detect(as.character(Source), regex("782|789|1850|1854|1859|7810|7813|7819|7839", ignore_case = TRUE)) ~ "Weapons",
+    str_detect(as.character(Source), regex("1841|5220|5221|5222|5223|5224|5225|5226|5227|5228|5229|5321|5329", ignore_case = TRUE)) ~ "F&B",
+    TRUE ~ "Uncategorized"
+  ))
+
+# Renaming the column names
+injury_data <- injury_data |>
+  select(
+    `year`,
+    `industry`,
+    `Employer`,
+    `City`,
+    `State`, 
+    `Hospitalized`, 
+    `Amputation`,
+    `nature_category`,
+    `event_category`,
+    `source_category`,
+    `body_part`,
+    `Final Narrative`
+  )|>
+  rename(
+    employer = `Employer`,
+    city = `City`,
+    state = `State`, 
+    hospitalization = `Hospitalized`, 
+    amputation = `Amputation`,
+    description = `Final Narrative`
+  )
+injury_data <- injury_data |>
+  filter(industry != "Uncategorized")
+
+# Saving the clean data into a csv file
+file_path <- "/Users/sarithakumarik/Documents/DATA6200/FinalProject/Dataset/critical_injuries_data.csv"
+write.csv(injury_data, file_path, row.names = FALSE)
