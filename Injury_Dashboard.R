@@ -2077,3 +2077,321 @@ server <- function(input, output, session) {
 
 # Run the Shiny app
 shinyApp(ui = ui, server = server)
+
+
+# OSHA Injury Risk Dashboard with modelling
+# -------------------------------------------------------------------------
+
+# ---- Packages ----
+packages <- c(
+  "shiny","shinythemes","bslib","tidyverse","lubridate","janitor","scales",
+  "DT","plotly","leaflet","sf","tidymodels","textrecipes","tidytext",
+  "topicmodels","widyr","ggrepel","gt","gtExtras","cluster","factoextra",
+  "randomForest","glmnet","ranger"
+)
+to_install <- packages[!packages %in% installed.packages()[, "Package"]]
+if (length(to_install)) install.packages(to_install, dependencies = TRUE)
+lapply(packages, library, character.only = TRUE)
+
+options(shiny.maxRequestSize = 200*1024^2)
+
+# ---- UI ----
+ui <- navbarPage(
+  title = "OSHA Injury Risk Insights",
+  theme = shinytheme("flatly"),
+
+  # Upload
+  tabPanel("Upload & Filters",
+    sidebarLayout(
+      sidebarPanel(width = 3,
+        fileInput("file", "Upload OSHA CSV", accept = c(".csv")),
+        checkboxInput("has_header", "Header row", TRUE),
+        selectInput("dt_format", "Date column format", 
+                    choices = c("ymd","mdy","dmy"), selected = "ymd"),
+        sliderInput("year_filter", "Year range", min = 2015, max = year(Sys.Date()),
+                    value = c(2019, year(Sys.Date())), step = 1, sep = ""),
+        selectizeInput("state_filter", "States", choices = NULL, multiple = TRUE),
+        selectizeInput("naics_filter", "NAICS", choices = NULL, multiple = TRUE),
+        selectizeInput("employer_filter", "Employers", choices = NULL, multiple = TRUE),
+        textInput("keyword", "Narrative keyword filter (optional)", ""),
+        helpText("Expected columns: EventDate, Employer, City, State, NAICS, Hospitalized, Amputation, Narrative, Latitude, Longitude")
+      ),
+      mainPanel(
+        h4("Data snapshot"),
+        DTOutput("table_head"),
+        br(),
+        fluidRow(
+          column(4, gt_output("kpi_total")),
+          column(4, gt_output("kpi_hosp")),
+          column(4, gt_output("kpi_ampt"))
+        )
+      )
+    )
+  ),
+
+  tabPanel("EDA",
+    fluidRow(
+      column(6, plotlyOutput("ts_trend")),
+      column(6, plotlyOutput("by_state"))
+    ),
+    fluidRow(
+      column(6, plotlyOutput("by_naics")),
+      column(6, plotlyOutput("repeat_employers"))
+    )
+  ),
+
+  tabPanel("NLP (TF-IDF & Keywords)",
+    fluidRow(
+      column(6, plotlyOutput("tfidf_terms")),
+      column(6, DTOutput("keywords_tbl"))
+    )
+  ),
+
+  tabPanel("Topics (LDA)",
+    sidebarLayout(
+      sidebarPanel(width = 3,
+        sliderInput("n_topics", "Number of topics (LDA)", min = 3, max = 12, value = 6, step = 1),
+        numericInput("top_n_terms", "Top terms per topic", value = 8, min = 5, max = 20),
+        actionButton("run_lda", "Run / Refresh LDA")
+      ),
+      mainPanel(
+        plotlyOutput("lda_terms_plot"),
+        DTOutput("doc_topics_tbl")
+      )
+    )
+  ),
+
+  tabPanel("Clustering",
+    sidebarLayout(
+      sidebarPanel(width = 3,
+        selectInput("cluster_level", "Cluster by", choices = c("Incidents","Employers"), selected = "Employers"),
+        sliderInput("k", "k (clusters)", min = 2, max = 10, value = 4),
+        checkboxGroupInput("cluster_features", "Features",
+                           choices = c("HospRate","AmputationRate","Incidents","UniqueNAICS"),
+                           selected = c("HospRate","Incidents"))
+      ),
+      mainPanel(
+        plotOutput("cluster_plot"),
+        DTOutput("cluster_centers")
+      )
+    )
+  ),
+
+  # Modeling
+  tabPanel("Modeling (Predict Hospitalization)",
+    sidebarLayout(
+      sidebarPanel(width = 3,
+        selectInput("model_type", "Model", choices = c("Logistic Regression","Random Forest"), selected = "Random Forest"),
+        sliderInput("train_prop", "Train proportion", min = 0.5, max = 0.9, value = 0.8, step = 0.05),
+        numericInput("rf_trees", "Random Forest trees", value = 300, min = 50, max = 1000),
+        actionButton("train_model", "Train / Evaluate")
+      ),
+      mainPanel(
+        h5("Performance"),
+        verbatimTextOutput("model_metrics"),
+        plotOutput("roc_plot"),
+        DTOutput("feat_importance")
+      )
+    )
+  ),
+
+  # Map
+  tabPanel("Map (Hotspots)",
+    fluidRow(
+      column(12, leafletOutput("map", height = 600))
+    )
+  ),
+
+  # High-Risk Employers
+  tabPanel("High-Risk Employers",
+    fluidRow(
+      column(12, DTOutput("employer_rank"))
+    )
+  )
+)
+
+# ---- Server ----
+server <- function(input, output, session) {
+
+  # Load & Clean
+  raw <- reactive({
+    req(input$file)
+    df <- readr::read_csv(input$file$datapath, show_col_types = FALSE)
+    df <- janitor::clean_names(df)
+    date_fun <- switch(input$dt_format, ymd = lubridate::ymd, mdy = lubridate::mdy, dmy = lubridate::dmy)
+    if ("eventdate" %in% names(df)) df$event_date <- df$eventdate
+    if (!"event_date" %in% names(df)) stop("Missing event_date/EventDate column.")
+    df <- df %>%
+      mutate(
+        event_date = date_fun(event_date),
+        year = year(event_date),
+        hospitalized = if_else(tolower(as.character(hospitalized)) %in% c("1","yes","y","true","t"), 1, 0),
+        amputation   = if_else(tolower(as.character(amputation))   %in% c("1","yes","y","true","t"), 1, 0),
+        narrative = as.character(narrative)
+      ) %>% filter(!is.na(event_date))
+    df
+  })
+
+  # Update filters
+  observeEvent(raw(), {
+    df <- raw()
+    updateSelectizeInput(session, "state_filter", choices = sort(unique(df$state)), server = TRUE)
+    updateSelectizeInput(session, "naics_filter", choices = sort(unique(df$naics)), server = TRUE)
+    updateSelectizeInput(session, "employer_filter", choices = sort(unique(df$employer)), server = TRUE)
+    updateSliderInput(session, "year_filter", min = min(df$year, na.rm = TRUE), max = max(df$year, na.rm = TRUE),
+                      value = c(max(min(df$year), 2018), max(df$year)))
+  })
+
+  # Apply filters
+  filtered <- reactive({
+    df <- req(raw())
+    df <- df %>% filter(between(year, input$year_filter[1], input$year_filter[2]))
+    if (length(input$state_filter)) df <- df %>% filter(state %in% input$state_filter)
+    if (length(input$naics_filter)) df <- df %>% filter(naics %in% input$naics_filter)
+    if (length(input$employer_filter)) df <- df %>% filter(employer %in% input$employer_filter)
+    if (nzchar(input$keyword)) df <- df %>% filter(str_detect(tolower(narrative), tolower(input$keyword)))
+    validate(need(nrow(df) > 0, "No rows after filters. Adjust filters."))
+    df
+  })
+
+  # KPIs
+  kpi_card <- function(title, value) {
+    gt(data.frame(Title = title, Value = value)) |> gt_theme_guardian() |> fmt_number(columns = "Value", decimals = 0)
+  }
+  output$kpi_total <- render_gt({ kpi_card("Incidents", nrow(filtered())) })
+  output$kpi_hosp  <- render_gt({ kpi_card("Hospitalizations", sum(filtered()$hospitalized, na.rm = TRUE)) })
+  output$kpi_ampt  <- render_gt({ kpi_card("Amputations", sum(filtered()$amputation, na.rm = TRUE)) })
+  output$table_head <- renderDT({ datatable(head(filtered(), 50), options = list(pageLength = 10, scrollX = TRUE)) })
+
+  # === EDA ===
+  output$ts_trend <- renderPlotly({
+    df <- filtered() %>% count(date = floor_date(event_date, "month"))
+    ggplotly(ggplot(df, aes(date, n)) + geom_line() + geom_point() + labs(title = "Incidents over time"))
+  })
+  output$by_state <- renderPlotly({
+    df <- filtered() %>% count(state, sort = TRUE) %>% slice_max(n, n = 25)
+    ggplotly(ggplot(df, aes(reorder(state, n), n)) + geom_col() + coord_flip())
+  })
+  output$by_naics <- renderPlotly({
+    df <- filtered() %>% count(naics, sort = TRUE) %>% slice_max(n, n = 25)
+    ggplotly(ggplot(df, aes(reorder(naics, n), n)) + geom_col() + coord_flip())
+  })
+  output$repeat_employers <- renderPlotly({
+    df <- filtered() %>% count(employer, sort = TRUE) %>% slice_max(n, n = 25)
+    ggplotly(ggplot(df, aes(reorder(employer, n), n)) + geom_col() + coord_flip())
+  })
+
+  # === NLP: TF-IDF ===
+  tokens <- reactive({
+    df <- filtered() %>% select(id = row_number(), narrative)
+    df %>% unnest_tokens(word, narrative) %>% anti_join(stop_words, by = "word") %>% filter(str_detect(word, "^[a-z]+$"))
+  })
+  output$tfidf_terms <- renderPlotly({
+    tfidf <- tokens() %>% count(id, word, sort = TRUE) %>% bind_tf_idf(word, id, n) %>%
+      group_by(word) %>% summarize(tf_idf = max(tf_idf), .groups = "drop") %>% slice_max(tf_idf, n = 25)
+    ggplotly(ggplot(tfidf, aes(tf_idf, fct_inorder(word))) + geom_col())
+  })
+  output$keywords_tbl <- renderDT({
+    tfidf <- tokens() %>% count(id, word, sort = TRUE) %>% bind_tf_idf(word, id, n) %>% arrange(desc(tf_idf))
+    datatable(slice_max(tfidf, tf_idf, n = 200))
+  })
+
+  # === Topics: LDA ===
+  lda_results <- eventReactive(input$run_lda, {
+    tidy <- tokens()
+    doc_term <- tidy %>% count(id, word) %>% cast_dtm(id, word, n)
+    m <- LDA(doc_term, k = input$n_topics, control = list(seed = 123))
+    list(model = m, dtm = doc_term)
+  }, ignoreInit = TRUE)
+  output$lda_terms_plot <- renderPlotly({
+    m <- req(lda_results())$model
+    terms <- tidy(m, matrix = "beta") %>% group_by(topic) %>% slice_max(beta, n = input$top_n_terms)
+    ggplotly(ggplot(terms, aes(beta, fct_inorder(term))) + geom_col() + facet_wrap(~ topic, scales = "free_y"))
+  })
+  output$doc_topics_tbl <- renderDT({
+    m <- req(lda_results())$model
+    docs <- tidy(m, matrix = "gamma") %>% group_by(document) %>% slice_max(gamma, n = 1)
+    datatable(docs)
+  })
+
+  # === Clustering ===
+  cluster_data <- reactive({
+    df <- filtered()
+    if (input$cluster_level == "Employers") {
+      agg <- df %>% group_by(employer) %>%
+        summarise(Incidents = n(), HospRate = mean(hospitalized), AmputationRate = mean(amputation), UniqueNAICS = n_distinct(naics))
+      rownames(agg) <- agg$employer; agg
+    } else {
+      df %>% mutate(Incidents = 1, HospRate = hospitalized, AmputationRate = amputation, UniqueNAICS = as.numeric(as.factor(naics))) %>%
+        select(Incidents, HospRate, AmputationRate, UniqueNAICS)
+    }
+  })
+  output$cluster_plot <- renderPlot({
+    dat <- cluster_data(); feats <- intersect(input$cluster_features, names(dat))
+    km <- kmeans(scale(dat[,feats]), centers = input$k, nstart = 20)
+    fviz_cluster(km, data = as.data.frame(scale(dat[,feats])))
+  })
+  output$cluster_centers <- renderDT({
+    dat <- cluster_data(); feats <- intersect(input$cluster_features, names(dat))
+    km <- kmeans(scale(dat[,feats]), centers = input$k, nstart = 20)
+    datatable(as.data.frame(km$centers))
+  })
+
+  # === Modeling ===
+  model_obj <- eventReactive(input$train_model, {
+    df <- filtered() %>% mutate(severe = factor(if_else(hospitalized == 1,"Yes","No")))
+    split <- initial_split(df, prop = input$train_prop, strata = severe)
+    tr <- training(split); te <- testing(split)
+    rec <- recipe(severe ~ ., data = tr) |> step_zv(all_predictors()) |>
+      step_text_normalization(narrative) |> step_tokenize(narrative) |> step_stopwords(narrative) |>
+      step_tfidf(narrative)
+    if (input$model_type == "Logistic Regression") {
+      mod <- logistic_reg(mode = "classification", penalty = tune(), mixture = 1) |> set_engine("glmnet")
+      grid <- grid_regular(penalty(), levels = 10)
+    } else {
+      mod <- rand_forest(mode = "classification", trees = input$rf_trees, mtry = tune(), min_n = tune()) |> set_engine("ranger", importance = "impurity")
+      grid <- grid_regular(mtry(range = c(2, 20)), min_n(), levels = 5)
+    }
+    wf <- workflow() |> add_model(mod) |> add_recipe(rec)
+    folds <- vfold_cv(tr, v = 5, strata = severe)
+    tuned <- tune_grid(wf, resamples = folds, grid = grid, metrics = metric_set(roc_auc, accuracy))
+    best <- select_best(tuned, "roc_auc")
+    final_wf <- finalize_workflow(wf, best); final_fit <- fit(final_wf, tr)
+    preds <- predict(final_fit, te, type = "prob") %>% bind_cols(te %>% select(severe))
+    list(fit = final_fit, preds = preds)
+  })
+  output$model_metrics <- renderPrint({
+    preds <- req(model_obj())$preds
+    preds <- preds %>% mutate(.pred_class = if_else(.pred_Yes >= 0.5, "Yes","No"))
+    list(Accuracy = accuracy(preds, truth = severe, estimate = .pred_class)$.estimate,
+         ROC_AUC = roc_auc(preds, truth = severe, .pred_Yes)$.estimate)
+  })
+  output$roc_plot <- renderPlot({
+    preds <- req(model_obj())$preds
+    roc <- roc_curve(preds, truth = severe, .pred_Yes)
+    ggplot(roc, aes(1 - specificity, sensitivity)) + geom_path() + geom_abline(lty = 3)
+  })
+  output$feat_importance <- renderDT({
+    fit <- model_obj()$fit; eng <- extract_fit_engine(fit)
+    if ("variable.importance" %in% names(eng)) {
+      imp <- tibble(term = names(eng$variable.importance), importance = eng$variable.importance)
+      datatable(arrange(imp, desc(importance)))
+    } else datatable(tibble())
+  })
+
+  # === Map ===
+  output$map <- renderLeaflet({
+    df <- filtered() %>% filter(!is.na(latitude), !is.na(longitude))
+    leaflet(df) %>% addTiles() %>% addCircleMarkers(~longitude, ~latitude, popup = ~paste(employer, city, state), radius = 5)
+  })
+
+  # === Employer Ranking ===
+  output$employer_rank <- renderDT({
+    df <- filtered() %>% group_by(employer) %>%
+      summarise(Incidents = n(), HospRate = mean(hospitalized), AmputationRate = mean(amputation)) %>%
+      mutate(RiskScore = Incidents*0.5 + HospRate*35 + AmputationRate*15) %>% arrange(desc(RiskScore))
+    datatable(df)
+  })
+}
+
+shinyApp(ui, server)
